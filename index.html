@@ -1,109 +1,277 @@
-<!-- ====== FUENTE CINZEL ====== -->
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mundos Sagrados - Argentum Online</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
 
 <style>
-body{
-    margin:0;
-    background:#0a0a0f;
-    color:white;
-    font-family:'Cinzel', serif;
-    text-align:center;
+
+body {
+    margin: 0;
+    background: #000;
+    font-family: 'Cinzel', serif;
+    color: white;
+    overflow-x: hidden;
+    letter-spacing: 1px;
+}
+
+/* ===== FIRE CANVAS ===== */
+#fireCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+header, .container, footer, .music-controls {
+    position: relative;
+    z-index: 1;
+}
+
+header {
+    text-align: center;
+    padding: 50px 0;
+}
+
+.logo img {
+    max-width: 320px;
+    transition: transform 0.08s linear;
+}
+
+/* ===== CONTENIDO ===== */
+.container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 40px;
+    flex-wrap: wrap;
+}
+
+.bloque {
+    text-align: center;
+}
+
+.bloque img {
+    max-width: 300px;
+}
+
+.video {
+    width: 300px;
+    height: 200px;
 }
 
 /* ===== CONTROLES MUSICA ===== */
-.music-controls{
-    position:fixed;
-    top:20px;
-    right:20px;
-    background:rgba(0,0,0,0.6);
-    padding:15px;
-    border-radius:12px;
-    backdrop-filter:blur(10px);
-    box-shadow:0 0 20px rgba(255,215,0,0.4);
+.music-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.6);
+    padding: 15px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px rgba(255,140,0,0.4);
+    text-align: center;
 }
 
-.music-btn{
-    font-size:22px;
-    cursor:pointer;
-    background:none;
-    border:none;
-    color:gold;
+.music-btn {
+    font-size: 22px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: orange;
 }
 
-.volume-slider{
-    width:100px;
-    margin-top:10px;
+.volume-slider {
+    width: 100px;
+    margin-top: 8px;
 }
 
 /* ===== FOOTER ===== */
-footer{
-    margin-top:80px;
-    padding:20px;
-    font-size:14px;
-    color:rgba(255,255,255,0.6);
-    border-top:1px solid rgba(255,215,0,0.3);
+footer {
+    text-align: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.6);
+    font-size: 14px;
+    border-top: 1px solid rgba(255,140,0,0.3);
 }
+
 </style>
+</head>
 
-<!-- ====== AUDIO ====== -->
-<audio id="bgMusic" loop>
-    <source src="musica.mp3" type="audio/mpeg">
-</audio>
+<body>
 
-<!-- ====== CONTROLES ====== -->
+<canvas id="fireCanvas"></canvas>
+
+<!-- CONTROLES MUSICA -->
 <div class="music-controls">
-    <button id="musicToggle" class="music-btn">🔊</button>
-    <br>
-    <input type="range" id="volumeControl" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
+    <button id="musicToggle" class="music-btn">🔊</button><br>
+    <input type="range" id="volumeControl" class="volume-slider" min="0" max="1" step="0.01" value="0.4">
 </div>
 
-<!-- ====== VIDEO EJEMPLO ====== -->
-<!-- Si tenés varios videos, funciona igual -->
-<video id="mainVideo" width="600" controls style="margin-top:100px;">
-    <source src="video.mp4" type="video/mp4">
-</video>
+<header>
+    <div class="logo">
+        <img id="logoImg" src="logo.png" alt="Argentum Online">
+    </div>
+</header>
 
-<!-- ====== FOOTER ====== -->
+<section class="container">
+    <div class="bloque">
+        <iframe id="ytVideo" class="video"
+        src="https://www.youtube.com/embed/xYVDuS3nDoo?enablejsapi=1"
+        frameborder="0"
+        allow="autoplay; encrypted-media"
+        allowfullscreen></iframe>
+        <p>Video</p>
+    </div>
+
+    <div class="bloque">
+        <img src="imagen1.png" alt="Imagen">
+        <p>Texto de la imagen</p>
+    </div>
+</section>
+
 <footer>
     © Mundos Sagrados Argentum Online — Todos los derechos reservados
 </footer>
 
+<audio id="bgMusic" loop>
+    <source src="principal.mp3" type="audio/mpeg">
+</audio>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
 <script>
+
+/* ===== SISTEMA FUEGO + BASS ===== */
+
+const canvas = document.getElementById("fireCanvas");
+const ctx = canvas.getContext("2d");
+const logo = document.getElementById("logoImg");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let sparks = [];
+let fireIntensity = 80;
+
 const music = document.getElementById("bgMusic");
+music.volume = 0.4;
+
 const toggleBtn = document.getElementById("musicToggle");
 const volumeSlider = document.getElementById("volumeControl");
-const video = document.getElementById("mainVideo");
 
 let isPlaying = false;
 
-/* ===== ACTIVAR / DESACTIVAR MUSICA ===== */
+/* ===== BOTON MUSICA ===== */
 toggleBtn.addEventListener("click", () => {
     if(isPlaying){
         music.pause();
         toggleBtn.textContent = "🔇";
     }else{
         music.play();
+        audioCtx.resume();
         toggleBtn.textContent = "🔊";
     }
     isPlaying = !isPlaying;
 });
 
-/* ===== CONTROL VOLUMEN ===== */
+/* ===== VOLUMEN ===== */
 volumeSlider.addEventListener("input", () => {
     music.volume = volumeSlider.value;
 });
 
-/* ===== SI EL VIDEO SE REPRODUCE → PAUSA MUSICA ===== */
-video.addEventListener("play", () => {
-    if(isPlaying){
-        music.pause();
+/* ===== AUDIO CONTEXT ===== */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const source = audioCtx.createMediaElementSource(music);
+const analyser = audioCtx.createAnalyser();
+
+source.connect(analyser);
+analyser.connect(audioCtx.destination);
+analyser.fftSize = 256;
+
+const bufferLength = analyser.frequencyBinCount;
+const dataArray = new Uint8Array(bufferLength);
+
+class Spark {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + Math.random() * 50;
+        this.size = Math.random() * 4 + 1;
+        this.speedY = Math.random() * 2 + 1;
+        this.opacity = Math.random();
     }
+    update() {
+        this.y -= this.speedY;
+        this.opacity -= 0.01;
+    }
+    draw(intensity) {
+        ctx.shadowBlur = intensity / 8;
+        ctx.shadowColor = "orange";
+        ctx.fillStyle = `rgba(255, ${Math.random()*200}, 0, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    analyser.getByteFrequencyData(dataArray);
+    let bass = dataArray.slice(0, 20).reduce((a,b)=>a+b,0) / 20;
+
+    fireIntensity = 60 + bass * 1.2;
+
+    let scale = 1 + (bass / 400);
+    let rotate = (bass / 60) - 1;
+    logo.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+
+    if (sparks.length < fireIntensity) sparks.push(new Spark());
+
+    sparks.forEach((spark, index) => {
+        spark.update();
+        spark.draw(fireIntensity);
+        if (spark.opacity <= 0) sparks.splice(index, 1);
+    });
+}
+
+/* ===== YOUTUBE API CONTROL ===== */
+
+let player;
+
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player('ytVideo', {
+        events: {
+            'onStateChange': onPlayerStateChange
+        }
+    });
+}
+
+function onPlayerStateChange(event) {
+    if(event.data === YT.PlayerState.PLAYING){
+        if(isPlaying) music.pause();
+    }
+    if(event.data === YT.PlayerState.PAUSED){
+        if(isPlaying) music.play();
+    }
+}
+
+/* ===== INIT ===== */
+animate();
+
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 });
 
-/* ===== SI EL VIDEO SE PAUSA → CONTINUA MUSICA ===== */
-video.addEventListener("pause", () => {
-    if(isPlaying){
-        music.play();
-    }
-});
 </script>
+
+</body>
+</html>
