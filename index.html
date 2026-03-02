@@ -10,8 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
 
     <style>
-        * { cursor: default; }
-
         body {
             margin: 0;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('mapa_ao.jpg');
@@ -48,33 +46,11 @@
             border-bottom: 1px solid rgba(255, 215, 0, 0.3);
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        #logoHeader { width: 50px; height: 50px; object-fit: contain; }
+        .header-title { color: #FFD700; font-size: 20px; font-weight: 700; }
 
-        #logoHeader {
-            width: 50px;
-            height: 50px;
-            object-fit: contain;
-        }
-
-        .header-title {
-            color: #FFD700;
-            font-size: 20px;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-        }
-
-        nav ul {
-            list-style: none;
-            display: flex;
-            gap: 25px;
-            margin: 0;
-            padding: 0;
-        }
-
+        nav ul { list-style: none; display: flex; gap: 25px; margin: 0; padding: 0; }
         nav ul li a {
             text-decoration: none;
             color: #fff;
@@ -83,11 +59,7 @@
             transition: 0.3s;
             cursor: pointer;
         }
-
-        nav ul li a:hover {
-            color: #FFD700;
-            text-shadow: 0 0 15px #FFD700;
-        }
+        nav ul li a:hover { color: #FFD700; text-shadow: 0 0 15px #FFD700; }
 
         /* --- CONTENIDO CENTRAL --- */
         .main-content {
@@ -102,30 +74,9 @@
             padding: 40px 0;
         }
 
-        #logoCentral {
-            width: 280px;
-            height: 280px;
-            object-fit: contain;
-            filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.2));
-            margin-bottom: 20px;
-        }
-
-        .main-title-big {
-            font-size: 65px;
-            color: #FFD700;
-            margin: 10px 0;
-            text-shadow: 2px 2px 10px #000;
-        }
-
-        .beta-text {
-            font-size: 22px;
-            color: #fff;
-            background: rgba(0,0,0,0.7);
-            padding: 12px 35px;
-            border-radius: 50px;
-            border: 1px solid #FFD700;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
-        }
+        #logoCentral { width: 280px; height: 280px; object-fit: contain; margin-bottom: 20px; }
+        .main-title-big { font-size: 65px; color: #FFD700; margin: 10px 0; text-shadow: 2px 2px 10px #000; }
+        .beta-text { font-size: 22px; color: #fff; background: rgba(0,0,0,0.7); padding: 12px 35px; border-radius: 50px; border: 1px solid #FFD700; }
 
         /* --- NPC --- */
         #npc-container {
@@ -137,44 +88,49 @@
             z-index: 8;
             animation: walk-across 22s linear infinite;
         }
+        #npc { width: 64px; height: 64px; background: url('npc_sprite.png') no-repeat; animation: sprite-animation 0.8s steps(4) infinite; }
+        @keyframes walk-across { 0% { left: -100px; transform: scaleX(1); } 48% { transform: scaleX(1); } 50% { left: 110%; transform: scaleX(-1); } 98% { transform: scaleX(-1); } 100% { left: -100px; transform: scaleX(1); } }
+        @keyframes sprite-animation { from { background-position: 0px; } to { background-position: -256px; } }
 
-        #npc {
-            width: 64px;
-            height: 64px;
-            background: url('npc_sprite.png') no-repeat;
-            animation: sprite-animation 0.8s steps(4) infinite;
-        }
-
-        @keyframes walk-across {
-            0% { left: -100px; transform: scaleX(1); }
-            48% { transform: scaleX(1); }
-            50% { left: 110%; transform: scaleX(-1); }
-            98% { transform: scaleX(-1); }
-            100% { left: -100px; transform: scaleX(1); }
-        }
-
-        @keyframes sprite-animation {
-            from { background-position: 0px; }
-            to { background-position: -256px; }
-        }
-
-        /* --- MUSICA --- */
-        .music-controls {
+        /* --- CONTROLES DE MÚSICA --- */
+        .music-box {
             position: fixed;
             bottom: 120px;
             right: 30px;
             z-index: 100;
             background: rgba(0,0,0,0.85);
-            padding: 12px;
+            padding: 15px;
             border-radius: 12px;
             border: 1px solid #FFD700;
             text-align: center;
+            min-width: 150px;
         }
 
-        .music-btn { font-size: 22px; background: none; border: none; color: #FFD700; cursor: pointer; }
-        .volume-slider { width: 80px; accent-color: #FFD700; cursor: pointer; }
+        .music-box span { color: #FFD700; font-size: 12px; font-weight: bold; display: block; margin-bottom: 10px; }
 
-        /* --- FOOTER (Línea más fina y suave) --- */
+        .btn-audio {
+            background: #FFD700;
+            color: #000;
+            border: none;
+            padding: 5px 10px;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            margin: 2px;
+            border-radius: 4px;
+        }
+
+        .btn-audio:hover { background: #fff; }
+
+        .volume-slider {
+            width: 100%;
+            accent-color: #FFD700;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* --- FOOTER --- */
         footer {
             position: relative;
             z-index: 20;
@@ -183,9 +139,7 @@
             background: #000;
             color: #FFD700; 
             font-weight: bold;
-            font-size: 15px;
-            border-top: 1px solid rgba(255, 215, 0, 0.4); /* LÍNEA FINA Y SUTIL */
-            letter-spacing: 1px;
+            border-top: 1px solid rgba(255, 215, 0, 0.4);
         }
     </style>
 </head>
@@ -215,14 +169,16 @@
 </div>
 
 <div class="main-content">
-    <img id="logoCentral" src="logo.png" alt="Logo Central Mundos Sagrados">
+    <img id="logoCentral" src="logo.png" alt="Logo Central">
     <h1 class="main-title-big">MUNDOS SAGRADOS</h1>
     <div class="beta-text" id="countdown"></div>
 </div>
 
-<div class="music-controls">
-    <button id="musicToggle" class="music-btn">🔊</button><br>
-    <input type="range" id="volumeControl" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
+<div class="music-box">
+    <span>AMBIENTACIÓN</span>
+    <button class="btn-audio" id="playBtn">ACTIVAR</button>
+    <button class="btn-audio" id="stopBtn" style="background: #444; color: #fff;">DESACTIVAR</button>
+    <input type="range" id="volControl" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
 </div>
 
 <footer>
@@ -234,100 +190,22 @@
 </audio>
 
 <script>
-/* ===== MUSICA ===== */
+/* ===== LÓGICA DE MÚSICA ===== */
 const music = document.getElementById("bgMusic");
-const toggleBtn = document.getElementById("musicToggle");
-const volumeSlider = document.getElementById("volumeControl");
-let isPlaying = false;
+const playBtn = document.getElementById("playBtn");
+const stopBtn = document.getElementById("stopBtn");
+const volControl = document.getElementById("volControl");
 
-window.addEventListener("load", () => {
-    music.volume = 0.5;
-    document.addEventListener("click", () => {
-        if (!isPlaying) { music.play().catch(() => {}); isPlaying = true; }
-    }, { once: true });
+// Configuración inicial
+music.volume = 0.5;
+
+playBtn.addEventListener("click", () => {
+    music.play().catch(e => console.log("Interacción requerida"));
 });
 
-toggleBtn.addEventListener("click", () => {
-    if(isPlaying){ music.pause(); toggleBtn.textContent = "🔇"; } 
-    else { music.play(); toggleBtn.textContent = "🔊"; }
-    isPlaying = !isPlaying;
+stopBtn.addEventListener("click", () => {
+    music.pause();
 });
 
-volumeSlider.addEventListener("input", () => { music.volume = volumeSlider.value; });
-
-/* ===== CONTADOR FECHA FIJA ===== */
-function updateCountdown() {
-    const countdown = document.getElementById("countdown");
-    const targetDate = new Date(2028, 2, 1, 0, 0, 0).getTime();
-    const now = new Date().getTime();
-    const diff = targetDate - now;
-
-    if (diff <= 0) {
-        countdown.innerHTML = "¡LA BETA HA COMENZADO!";
-        return;
-    }
-
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-
-    countdown.innerHTML = `Versión beta en ${days}d ${hours}h ${minutes}m ${seconds}s`;
-}
-setInterval(updateCountdown, 1000);
-updateCountdown();
-
-/* ===== FUEGO DESDE EL FOOTER ===== */
-const canvas = document.getElementById("fireCanvas");
-const ctx = canvas.getContext("2d");
-let footerElement = document.querySelector('footer');
-
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
-
-let sparks = [];
-class Spark {
-    constructor() { this.reset(); }
-    reset() {
-        this.x = Math.random() * canvas.width;
-        this.y = footerElement.getBoundingClientRect().top; 
-        this.size = Math.random() * 2 + 0.5;
-        this.speedY = Math.random() * 1.2 + 0.3;
-        this.speedX = (Math.random() - 0.5) * 0.2;
-        this.opacity = 1;
-        this.maxLife = Math.random() * 100 + 50;
-        this.life = 0;
-    }
-    update() {
-        this.y -= this.speedY;
-        this.x += this.speedX;
-        this.life++;
-        this.opacity = 1 - (this.life / this.maxLife);
-    }
-    draw() {
-        ctx.fillStyle = `rgba(255, ${160 + Math.random() * 40}, 0, ${this.opacity})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (sparks.length < 35) sparks.push(new Spark());
-    sparks.forEach((spark, index) => {
-        spark.update();
-        spark.draw();
-        if (spark.opacity <= 0) sparks.splice(index, 1);
-    });
-}
-animate();
-</script>
-
-</body>
-</html>
+volControl.addEventListener("input", () => {
+    music.
