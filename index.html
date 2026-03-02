@@ -64,6 +64,28 @@
             padding: 20px;
             background: rgba(0,0,0,0.6);
         }
+
+        /* BOTÓN DE MÚSICA */
+        #musicBtn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 12px 18px;
+            background: linear-gradient(145deg, #8b0000, #550000);
+            color: white;
+            border: 1px solid #aa0000;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 0 10px rgba(255,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+
+        #musicBtn:hover {
+            box-shadow: 0 0 20px rgba(255,0,0,0.8);
+            transform: scale(1.05);
+        }
     </style>
 </head>
 
@@ -98,7 +120,16 @@
     <p>Argentum Online 2024</p>
 </footer>
 
+<!-- BOTÓN MÚSICA -->
+<button id="musicBtn">🔊 Activar Música</button>
+
+<audio id="bgMusic" loop>
+    <source src="principal.mp3" type="audio/mpeg">
+</audio>
+
 <script>
+/* ================= FIRE EFFECT ================= */
+
 const canvas = document.getElementById("fireCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -139,7 +170,6 @@ function animate() {
     sparks.forEach((spark, index) => {
         spark.update();
         spark.draw();
-
         if (spark.opacity <= 0) {
             sparks.splice(index, 1);
         }
@@ -153,6 +183,53 @@ animate();
 window.addEventListener("resize", () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+});
+
+/* ================= MUSIC SYSTEM ================= */
+
+const music = document.getElementById("bgMusic");
+const btn = document.getElementById("musicBtn");
+
+music.volume = 0.3;
+
+function fadeIn(audio, duration = 2000) {
+    audio.volume = 0;
+    audio.play();
+    let step = 0.02;
+    let interval = duration / (1/step);
+    let fade = setInterval(() => {
+        if (audio.volume < 0.3) {
+            audio.volume = Math.min(audio.volume + step, 0.3);
+        } else {
+            clearInterval(fade);
+        }
+    }, interval);
+}
+
+function updateButton() {
+    if (!music.paused) {
+        btn.textContent = "🔇 Desactivar Música";
+    } else {
+        btn.textContent = "🔊 Activar Música";
+    }
+}
+
+btn.addEventListener("click", () => {
+    if (music.paused) {
+        fadeIn(music);
+        localStorage.setItem("musicActive", "true");
+    } else {
+        music.pause();
+        localStorage.setItem("musicActive", "false");
+    }
+    updateButton();
+});
+
+window.addEventListener("load", () => {
+    if (localStorage.getItem("musicActive") === "true") {
+        fadeIn(music);
+    }
+    updateButton();
 });
 </script>
 
