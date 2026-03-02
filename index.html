@@ -102,20 +102,19 @@
             padding: 40px 0;
         }
 
-        .main-title-big {
-            font-size: 65px;
-            color: #FFD700;
-            margin: 10px 0;
-            text-shadow: 2px 2px 10px #000;
-        }
-
-        /* LOGO CENTRAL RESPETANDO TAMAÑO ADECUADO */
         #logoCentral {
             width: 280px;
             height: 280px;
             object-fit: contain;
             filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.2));
             margin-bottom: 20px;
+        }
+
+        .main-title-big {
+            font-size: 65px;
+            color: #FFD700;
+            margin: 10px 0;
+            text-shadow: 2px 2px 10px #000;
         }
 
         .beta-text {
@@ -175,7 +174,7 @@
         .music-btn { font-size: 22px; background: none; border: none; color: #FFD700; cursor: pointer; }
         .volume-slider { width: 80px; accent-color: #FFD700; cursor: pointer; }
 
-        /* --- FOOTER --- */
+        /* --- FOOTER (Línea más fina y suave) --- */
         footer {
             position: relative;
             z-index: 20;
@@ -185,7 +184,7 @@
             color: #FFD700; 
             font-weight: bold;
             font-size: 15px;
-            border-top: 3px solid #FFD700;
+            border-top: 1px solid rgba(255, 215, 0, 0.4); /* LÍNEA FINA Y SUTIL */
             letter-spacing: 1px;
         }
     </style>
@@ -256,7 +255,7 @@ toggleBtn.addEventListener("click", () => {
 
 volumeSlider.addEventListener("input", () => { music.volume = volumeSlider.value; });
 
-/* ===== CONTADOR FECHA FIJA (MARZO 2028) ===== */
+/* ===== CONTADOR FECHA FIJA ===== */
 function updateCountdown() {
     const countdown = document.getElementById("countdown");
     const targetDate = new Date(2028, 2, 1, 0, 0, 0).getTime();
