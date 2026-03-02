@@ -101,16 +101,43 @@ footer {
 </audio>
 
 <script>
-/* ================= FUEGO DINÁMICO ================= */
+/* ================= FIRE + MUSIC SYNC ================= */
 
 const canvas = document.getElementById("fireCanvas");
 const ctx = canvas.getContext("2d");
-
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let sparks = [];
-let fireIntensity = 80; // intensidad base
+let fireIntensity = 80;
+
+// AUDIO SETUP
+const music = document.getElementById("bgMusic");
+music.volume = 0;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const source = audioCtx.createMediaElementSource(music);
+const analyser = audioCtx.createAnalyser();
+
+source.connect(analyser);
+analyser.connect(audioCtx.destination);
+analyser.fftSize = 256;
+
+const bufferLength = analyser.frequencyBinCount;
+const dataArray = new Uint8Array(bufferLength);
+
+function fadeIn(audio, targetVolume = 0.4, duration = 5000) {
+    let step = 0.01;
+    let interval = duration / (targetVolume / step);
+
+    let fade = setInterval(() => {
+        if (audio.volume < targetVolume) {
+            audio.volume = Math.min(audio.volume + step, targetVolume);
+        } else {
+            clearInterval(fade);
+        }
+    }, interval);
+}
 
 class Spark {
     constructor() {
@@ -126,8 +153,10 @@ class Spark {
         this.opacity -= 0.01;
     }
 
-    draw() {
-        ctx.fillStyle = `rgba(255, ${Math.random()*180}, 0, ${this.opacity})`;
+    draw(intensity) {
+        ctx.shadowBlur = intensity / 8;
+        ctx.shadowColor = "orange";
+        ctx.fillStyle = `rgba(255, ${Math.random()*200}, 0, ${this.opacity})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
@@ -135,7 +164,13 @@ class Spark {
 }
 
 function animate() {
+    requestAnimationFrame(animate);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    analyser.getByteFrequencyData(dataArray);
+
+    let bass = dataArray.slice(0, 20).reduce((a,b)=>a+b,0) / 20;
+    fireIntensity = 60 + bass * 1.2;
 
     if (sparks.length < fireIntensity) {
         sparks.push(new Spark());
@@ -143,38 +178,12 @@ function animate() {
 
     sparks.forEach((spark, index) => {
         spark.update();
-        spark.draw();
+        spark.draw(fireIntensity);
+
         if (spark.opacity <= 0) {
             sparks.splice(index, 1);
         }
     });
-
-    requestAnimationFrame(animate);
-}
-
-animate();
-
-window.addEventListener("resize", () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
-
-/* ================= MÚSICA CINEMÁTICA ================= */
-
-const music = document.getElementById("bgMusic");
-music.volume = 0;
-
-function fadeIn(audio, targetVolume = 0.35, duration = 5000) {
-    let step = 0.01;
-    let interval = duration / (targetVolume / step);
-
-    let fade = setInterval(() => {
-        if (audio.volume < targetVolume) {
-            audio.volume = Math.min(audio.volume + step, targetVolume);
-        } else {
-            clearInterval(fade);
-        }
-    }, interval);
 }
 
 window.addEventListener("load", () => {
@@ -182,17 +191,23 @@ window.addEventListener("load", () => {
 
     if (playPromise !== undefined) {
         playPromise.then(() => {
+            audioCtx.resume();
             fadeIn(music);
-            fireIntensity = 180; // 🔥 FUEGO MÁS INTENSO SI SUENA
         }).catch(() => {
-            // Si el navegador bloquea autoplay
             document.addEventListener("click", () => {
+                audioCtx.resume();
                 music.play();
                 fadeIn(music);
-                fireIntensity = 180;
             }, { once: true });
         });
     }
+
+    animate();
+});
+
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 });
 </script>
 
