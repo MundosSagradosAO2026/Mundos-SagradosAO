@@ -5,13 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mundos Sagrados - Argentum Online</title>
 
+<!-- GOOGLE FONT CINZEL -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+
 <style>
+
 body {
     margin: 0;
     background: #000;
-    font-family: Arial, sans-serif;
+    font-family: 'Cinzel', serif;
     color: white;
     overflow-x: hidden;
+    letter-spacing: 1px;
 }
 
 #fireCanvas {
@@ -31,11 +36,12 @@ header, .container, footer {
 
 header {
     text-align: center;
-    padding: 40px 0;
+    padding: 50px 0;
 }
 
 .logo img {
-    max-width: 300px;
+    max-width: 320px;
+    transition: transform 0.1s linear;
 }
 
 .container {
@@ -63,7 +69,9 @@ footer {
     text-align: center;
     padding: 20px;
     background: rgba(0,0,0,0.6);
+    font-size: 14px;
 }
+
 </style>
 </head>
 
@@ -73,7 +81,7 @@ footer {
 
 <header>
     <div class="logo">
-        <img src="logo.png" alt="Argentum Online">
+        <img id="logoImg" src="logo.png" alt="Argentum Online">
     </div>
 </header>
 
@@ -93,7 +101,7 @@ footer {
 </section>
 
 <footer>
-    <p>Argentum Online 2024</p>
+    <p>Mundos Sagrados - Argentum Online 2026</p>
 </footer>
 
 <audio id="bgMusic" autoplay loop>
@@ -101,17 +109,19 @@ footer {
 </audio>
 
 <script>
-/* ================= FIRE + MUSIC SYNC ================= */
+
+/* ===== FIRE + MUSIC SYNC SYSTEM ===== */
 
 const canvas = document.getElementById("fireCanvas");
 const ctx = canvas.getContext("2d");
+const logo = document.getElementById("logoImg");
+
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let sparks = [];
 let fireIntensity = 80;
 
-// AUDIO SETUP
 const music = document.getElementById("bgMusic");
 music.volume = 0;
 
@@ -129,7 +139,6 @@ const dataArray = new Uint8Array(bufferLength);
 function fadeIn(audio, targetVolume = 0.4, duration = 5000) {
     let step = 0.01;
     let interval = duration / (targetVolume / step);
-
     let fade = setInterval(() => {
         if (audio.volume < targetVolume) {
             audio.volume = Math.min(audio.volume + step, targetVolume);
@@ -168,9 +177,14 @@ function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     analyser.getByteFrequencyData(dataArray);
-
     let bass = dataArray.slice(0, 20).reduce((a,b)=>a+b,0) / 20;
+
     fireIntensity = 60 + bass * 1.2;
+
+    // ⚔ LOGO VIBRA CON LOS GRAVES
+    let scale = 1 + (bass / 400);
+    let rotate = (bass / 60) - 1;
+    logo.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
 
     if (sparks.length < fireIntensity) {
         sparks.push(new Spark());
@@ -179,7 +193,6 @@ function animate() {
     sparks.forEach((spark, index) => {
         spark.update();
         spark.draw(fireIntensity);
-
         if (spark.opacity <= 0) {
             sparks.splice(index, 1);
         }
@@ -209,6 +222,7 @@ window.addEventListener("resize", () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 });
+
 </script>
 
 </body>
