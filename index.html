@@ -208,4 +208,82 @@ stopBtn.addEventListener("click", () => {
 });
 
 volControl.addEventListener("input", () => {
-    music.
+    music.volume = volControl.value;
+});
+
+/* ===== CONTADOR FECHA FIJA ===== */
+function updateCountdown() {
+    const countdown = document.getElementById("countdown");
+    const targetDate = new Date(2028, 2, 1, 0, 0, 0).getTime();
+    const now = new Date().getTime();
+    const diff = targetDate - now;
+
+    if (diff <= 0) {
+        countdown.innerHTML = "¡LA BETA HA COMENZADO!";
+        return;
+    }
+
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    countdown.innerHTML = `Versión beta en ${days}d ${hours}h ${minutes}m ${seconds}s`;
+}
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+/* ===== FUEGO DESDE EL FOOTER ===== */
+const canvas = document.getElementById("fireCanvas");
+const ctx = canvas.getContext("2d");
+let footerElement = document.querySelector('footer');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+let sparks = [];
+class Spark {
+    constructor() { this.reset(); }
+    reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = footerElement.getBoundingClientRect().top; 
+        this.size = Math.random() * 2 + 0.5;
+        this.speedY = Math.random() * 1.2 + 0.3;
+        this.speedX = (Math.random() - 0.5) * 0.2;
+        this.opacity = 1;
+        this.maxLife = Math.random() * 100 + 50;
+        this.life = 0;
+    }
+    update() {
+        this.y -= this.speedY;
+        this.x += this.speedX;
+        this.life++;
+        this.opacity = 1 - (this.life / this.maxLife);
+    }
+    draw() {
+        ctx.fillStyle = `rgba(255, ${160 + Math.random() * 40}, 0, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (sparks.length < 35) sparks.push(new Spark());
+    sparks.forEach((spark, index) => {
+        spark.update();
+        spark.draw();
+        if (spark.opacity <= 0) sparks.splice(index, 1);
+    });
+}
+animate();
+</script>
+
+</body>
+</html>
