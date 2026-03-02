@@ -65,7 +65,7 @@
         .side-menu {
             position: fixed;
             top: 150px;
-            left: -180px; /* Oculto por defecto */
+            left: -200px; /* Oculto por defecto */
             width: 200px;
             background: rgba(0, 0, 0, 0.9);
             border: 1px solid #FFD700;
@@ -77,8 +77,7 @@
             box-shadow: 5px 0 15px rgba(255, 215, 0, 0.2);
         }
 
-        /* Al pasar el mouse o tener la clase 'open', se desliza */
-        .side-menu:hover {
+        .side-menu.open {
             left: 0;
         }
 
@@ -88,14 +87,16 @@
             top: 0;
             width: 40px;
             height: 100%;
-            background: rgba(255, 215, 0, 0.1);
-            border-right: 2px solid #FFD700;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #FFD700;
+            border-left: none;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             color: #FFD700;
-            font-size: 20px;
             cursor: pointer;
+            border-radius: 0 5px 5px 0;
         }
 
         .side-menu span { color: #FFD700; font-size: 14px; font-weight: bold; display: block; margin-bottom: 15px; text-align: center; }
@@ -117,8 +118,8 @@
 
         .btn-audio:hover { background: #fff; }
 
-        .vol-label { color: #fff; font-size: 11px; display: block; margin-top: 10px; text-align: center; }
-        .volume-slider { width: 100%; accent-color: #FFD700; cursor: pointer; }
+        .vol-container { display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 11px; margin-top: 10px; }
+        .volume-slider { width: 100%; accent-color: #FFD700; cursor: pointer; margin-top: 5px; }
 
         /* --- CONTENIDO CENTRAL --- */
         .main-content {
@@ -169,12 +170,18 @@
 <canvas id="fireCanvas"></canvas>
 
 <div class="side-menu" id="sideMenu">
-    <div class="side-menu-handle">⚙️</div>
+    <div class="side-menu-handle" id="menuHandle">
+        <span id="arrow">▶</span>
+        <span style="font-size: 14px;">🎵</span>
+    </div>
     <span>AMBIENTACIÓN</span>
     <button class="btn-audio" id="playBtn">ACTIVAR MÚSICA</button>
     <button class="btn-audio" id="stopBtn" style="background: #444; color: #fff;">SILENCIAR</button>
     
-    <label class="vol-label">VOLUMEN</label>
+    <div class="vol-container">
+        <label>VOLUMEN</label>
+        <label id="volLabel">50%</label>
+    </div>
     <input type="range" id="volControl" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
 </div>
 
@@ -213,42 +220,69 @@
 </audio>
 
 <script>
-/* ===== LÓGICA DE MÚSICA ===== */
+/* ===== LÓGICA DE MÚSICA Y MENÚ ===== */
 const music = document.getElementById("bgMusic");
 const playBtn = document.getElementById("playBtn");
 const stopBtn = document.getElementById("stopBtn");
 const volControl = document.getElementById("volControl");
+const volLabel = document.getElementById("volLabel");
 const sideMenu = document.getElementById("sideMenu");
+const menuHandle = document.getElementById("menuHandle");
+const arrow = document.getElementById("arrow");
+
+let closeTimer;
 
 music.volume = 0.5;
 
+// Función para cerrar el menú
+function closeMenu() {
+    sideMenu.classList.remove("open");
+    arrow.innerText = "▶";
+}
+
+// Función para resetear el contador de 5 segundos
+function resetTimer() {
+    clearTimeout(closeTimer);
+    if (sideMenu.classList.contains("open")) {
+        closeTimer = setTimeout(closeMenu, 5000);
+    }
+}
+
+// Click en la pestaña para abrir/cerrar
+menuHandle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sideMenu.classList.toggle("open");
+    if (sideMenu.classList.contains("open")) {
+        arrow.innerText = "◀";
+        resetTimer();
+    } else {
+        arrow.innerText = "▶";
+    }
+});
+
+// Evitar que el menú se cierre si el mouse está encima
+sideMenu.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+sideMenu.addEventListener("mouseleave", resetTimer);
+
 playBtn.addEventListener("click", () => {
     music.play().catch(e => console.log("Clic necesario"));
-    // Opcional: Cerrar menú al darle click
-    sideMenu.style.left = "-180px";
+    resetTimer();
 });
 
 stopBtn.addEventListener("click", () => {
     music.pause();
-    sideMenu.style.left = "-180px";
+    resetTimer();
 });
 
 volControl.addEventListener("input", () => {
     music.volume = volControl.value;
-});
-
-// Para asegurar que se cierre al sacar el ratón incluso si se forzó el cierre por código
-sideMenu.addEventListener("mouseleave", () => {
-    sideMenu.style.left = "-180px";
-});
-sideMenu.addEventListener("mouseenter", () => {
-    sideMenu.style.left = "0";
+    volLabel.innerText = Math.round(volControl.value * 100) + "%";
+    resetTimer();
 });
 
 /* ===== CONTADOR 2 AÑOS (Marzo 2028) ===== */
 function updateCountdown() {
     const countdown = document.getElementById("countdown");
-    // Fecha exacta: 1 de Marzo, 2028
     const targetDate = new Date(2028, 2, 1, 0, 0, 0).getTime();
     const now = new Date().getTime();
     const diff = targetDate - now;
