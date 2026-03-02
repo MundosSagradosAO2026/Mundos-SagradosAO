@@ -4,42 +4,157 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mundos Sagrados - Argentum Online</title>
-    <link rel="stylesheet" href="style.css">
+
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        #fireCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        header, .container, footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .logo img {
+            max-width: 300px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding: 40px;
+            flex-wrap: wrap;
+        }
+
+        .bloque {
+            text-align: center;
+        }
+
+        .bloque img {
+            max-width: 300px;
+        }
+
+        .video {
+            width: 300px;
+            height: 200px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.6);
+        }
+    </style>
 </head>
+
 <body>
-    <header>
-        <div class="logo">
-            <img src="logo.png" alt="Argentum Online" title="Argentum Online">
-        </div>
-        <div class="descargas">
-            <!-- <p>Descargalo YA!</p> -->
-            <!-- <a href="enlace-de-descarga" target="_blank" class="btn-azul">Descargar</a> -->
-            <!-- <a href="enlace-de-descarga" target="_blank" class="btn-azul">Mega</a> -->
-            <!-- <span>Tamaño de descarga 456 MB</span> -->
-            <!-- <span>Actualizado 28 de Mayo 2024</span> -->
-            <!-- <a href="enlace-de-discord" target="_blank" class="btn-violeta">Discord</a> -->
-            <!-- <a href="enlace-de-youtube" target="_blank" class="btn-rojo">YouTube</a> -->
-            <!-- <a href="enlace-de-otro" target="_blank" class="btn-verde">Otro</a> -->
-        </div>
-    </header>
 
-    <section class="container">
-        
-            <div class="bloque">
-                <iframe class="video" src="https://www.youtube.com/embed/xYVDuS3nDoo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-                <p>Video</p>
-            </div> 
-        
-         
-            <div class="bloque">
-                <img src="imagen1.png" alt="Imagen">
-                <p>Texto de la imagen</p>
-            </div> 
-        
-    </section>
+<canvas id="fireCanvas"></canvas>
 
-    <footer>
-        <p>Argentum Online 2024</p>
-    </footer> 
+<header>
+    <div class="logo">
+        <img src="logo.png" alt="Argentum Online" title="Argentum Online">
+    </div>
+</header>
+
+<section class="container">
+    
+    <div class="bloque">
+        <iframe class="video" 
+        src="https://www.youtube.com/embed/xYVDuS3nDoo" 
+        frameborder="0" 
+        allowfullscreen></iframe>
+        <p>Video</p>
+    </div> 
+    
+    <div class="bloque">
+        <img src="imagen1.png" alt="Imagen">
+        <p>Texto de la imagen</p>
+    </div> 
+        
+</section>
+
+<footer>
+    <p>Argentum Online 2024</p>
+</footer>
+
+<script>
+const canvas = document.getElementById("fireCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let sparks = [];
+
+class Spark {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + Math.random() * 50;
+        this.size = Math.random() * 4 + 1;
+        this.speedY = Math.random() * 2 + 1;
+        this.opacity = Math.random();
+    }
+
+    update() {
+        this.y -= this.speedY;
+        this.opacity -= 0.01;
+    }
+
+    draw() {
+        ctx.fillStyle = `rgba(255, ${Math.random()*150}, 0, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (sparks.length < 150) {
+        sparks.push(new Spark());
+    }
+
+    sparks.forEach((spark, index) => {
+        spark.update();
+        spark.draw();
+
+        if (spark.opacity <= 0) {
+            sparks.splice(index, 1);
+        }
+    });
+
+    requestAnimationFrame(animate);
+}
+
+animate();
+
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+
 </body>
 </html>
