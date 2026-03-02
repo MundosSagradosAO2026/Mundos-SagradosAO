@@ -17,7 +17,7 @@ body {
     overflow-x: hidden;
 }
 
-/* ===== FUEGO ===== */
+/* FUEGO */
 #fireCanvas {
     position: fixed;
     top: 0;
@@ -28,20 +28,18 @@ body {
     z-index: 0;
 }
 
-/* ===== HEADER ===== */
+/* HEADER */
 header {
     position: relative;
     z-index: 1;
     padding: 30px 40px;
 }
 
-/* Logo izquierda */
 #logoImg {
     max-width: 180px;
     float: left;
 }
 
-/* Título grande */
 .main-title {
     text-align: center;
     font-size: 60px;
@@ -55,7 +53,6 @@ header {
     margin-top: 40px;
 }
 
-/* Subtítulo contador */
 .beta-text {
     text-align: center;
     font-size: 26px;
@@ -68,7 +65,7 @@ header {
     margin-top: 20px;
 }
 
-/* CONTROLES MUSICA */
+/* MUSICA */
 .music-controls {
     position: fixed;
     top: 20px;
@@ -114,7 +111,6 @@ footer {
 
 <canvas id="fireCanvas"></canvas>
 
-<!-- CONTROLES -->
 <div class="music-controls">
     <button id="musicToggle" class="music-btn">🔊</button><br>
     <input type="range" id="volumeControl" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
@@ -131,9 +127,11 @@ footer {
     © Mundos Sagrados Argentum Online — Todos los derechos reservados
 </footer>
 
-<audio id="bgMusic" autoplay loop>
+<audio id="bgMusic" loop>
     <source src="principal.mp3" type="audio/mpeg">
 </audio>
+
+<!-- ================= SCRIPTS ================= -->
 
 <script>
 
@@ -147,18 +145,13 @@ let isPlaying = false;
 
 window.addEventListener("load", () => {
     music.volume = 0.5;
-    const playPromise = music.play();
 
-    if (playPromise !== undefined) {
-        playPromise.then(() => {
+    document.addEventListener("click", () => {
+        if (!isPlaying) {
+            music.play();
             isPlaying = true;
-        }).catch(() => {
-            document.addEventListener("click", () => {
-                music.play();
-                isPlaying = true;
-            }, { once: true });
-        });
-    }
+        }
+    }, { once: true });
 });
 
 toggleBtn.addEventListener("click", () => {
@@ -176,18 +169,15 @@ volumeSlider.addEventListener("input", () => {
     music.volume = volumeSlider.value;
 });
 
+</script>
+
 <script>
 
-/* ===== CONTADOR 2 AÑOS TIEMPO REAL (FIX) ===== */
+/* ===== CONTADOR 2 AÑOS TIEMPO REAL ===== */
 
 document.addEventListener("DOMContentLoaded", function() {
 
     const countdown = document.getElementById("countdown");
-
-    if (!countdown) {
-        console.error("No existe el elemento #countdown");
-        return;
-    }
 
     const targetDate = new Date();
     targetDate.setFullYear(targetDate.getFullYear() + 2);
@@ -226,13 +216,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
 
+<script>
+
 /* ===== FUEGO SIMPLE ===== */
 
 const canvas = document.getElementById("fireCanvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
 let sparks = [];
 
@@ -272,11 +269,6 @@ function animate() {
 }
 
 animate();
-
-window.addEventListener("resize", () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
 
 </script>
 
