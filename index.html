@@ -65,7 +65,7 @@
         .side-menu {
             position: fixed;
             top: 150px;
-            left: -200px; /* Oculto por defecto */
+            left: -205px; /* Más oculto hacia la izquierda */
             width: 200px;
             background: rgba(0, 0, 0, 0.9);
             border: 1px solid #FFD700;
@@ -73,7 +73,7 @@
             border-radius: 0 15px 15px 0;
             padding: 20px;
             z-index: 1000;
-            transition: 0.5s ease;
+            transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 5px 0 15px rgba(255, 215, 0, 0.2);
         }
 
@@ -83,11 +83,11 @@
 
         .side-menu-handle {
             position: absolute;
-            right: -40px;
+            right: -30px; /* Pestaña más fina y metida */
             top: 0;
-            width: 40px;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            width: 30px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.85);
             border: 1px solid #FFD700;
             border-left: none;
             display: flex;
@@ -96,7 +96,13 @@
             justify-content: center;
             color: #FFD700;
             cursor: pointer;
-            border-radius: 0 5px 5px 0;
+            border-radius: 0 8px 8px 0;
+            transition: 0.3s;
+        }
+        
+        .side-menu-handle:hover {
+            background: #FFD700;
+            color: #000;
         }
 
         .side-menu span { color: #FFD700; font-size: 14px; font-weight: bold; display: block; margin-bottom: 15px; text-align: center; }
@@ -171,7 +177,7 @@
 
 <div class="side-menu" id="sideMenu">
     <div class="side-menu-handle" id="menuHandle">
-        <span id="arrow">▶</span>
+        <span id="arrow" style="font-size: 10px;">▶</span>
         <span style="font-size: 14px;">🎵</span>
     </div>
     <span>AMBIENTACIÓN</span>
@@ -231,16 +237,23 @@ const menuHandle = document.getElementById("menuHandle");
 const arrow = document.getElementById("arrow");
 
 let closeTimer;
+let userInteracted = false;
 
 music.volume = 0.5;
 
-// Función para cerrar el menú
+// --- REPRODUCCIÓN AUTOMÁTICA AL TOCAR CUALQUIER LADO ---
+document.addEventListener('click', () => {
+    if (!userInteracted) {
+        music.play().catch(e => console.log("Esperando interacción real..."));
+        userInteracted = true;
+    }
+}, { once: false }); // Lo dejo activo para que siempre intente play al primer toque
+
 function closeMenu() {
     sideMenu.classList.remove("open");
     arrow.innerText = "▶";
 }
 
-// Función para resetear el contador de 5 segundos
 function resetTimer() {
     clearTimeout(closeTimer);
     if (sideMenu.classList.contains("open")) {
@@ -248,7 +261,6 @@ function resetTimer() {
     }
 }
 
-// Click en la pestaña para abrir/cerrar
 menuHandle.addEventListener("click", (e) => {
     e.stopPropagation();
     sideMenu.classList.toggle("open");
@@ -260,12 +272,11 @@ menuHandle.addEventListener("click", (e) => {
     }
 });
 
-// Evitar que el menú se cierre si el mouse está encima
 sideMenu.addEventListener("mouseenter", () => clearTimeout(closeTimer));
 sideMenu.addEventListener("mouseleave", resetTimer);
 
 playBtn.addEventListener("click", () => {
-    music.play().catch(e => console.log("Clic necesario"));
+    music.play();
     resetTimer();
 });
 
