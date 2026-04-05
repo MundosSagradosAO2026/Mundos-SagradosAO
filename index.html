@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>TSao Extractor + Analyzer PRO</title>
+<title>TSao Extractor FINAL</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
@@ -50,7 +50,7 @@ img{
 
 <body>
 
-<h2>TSao Extractor + Analyzer</h2>
+<h2>Extractor Grh.tsao FINAL</h2>
 
 <input type="file" id="fileInput">
 <br><br>
@@ -79,7 +79,7 @@ function hexDump(arr, max=64){
     return s;
 }
 
-// clave
+// clave VB6
 const keyStr = "quierovalecuatro";
 const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
 
@@ -108,12 +108,39 @@ function xorOffset(data, offset){
     return out;
 }
 
-function tryInflate(data){
+function tryAll(data, offset){
+
+    // 1 RAW DEFLATE
+    try{
+        return pako.inflateRaw(data);
+    }catch{}
+
+    // 2 ZLIB
     try{
         return pako.inflate(data);
-    }catch{
-        return null;
-    }
+    }catch{}
+
+    // 3 XOR FULL + RAW
+    try{
+        return pako.inflateRaw(xorFull(data));
+    }catch{}
+
+    // 4 XOR FULL + ZLIB
+    try{
+        return pako.inflate(xorFull(data));
+    }catch{}
+
+    // 5 XOR OFFSET + RAW
+    try{
+        return pako.inflateRaw(xorOffset(data, offset));
+    }catch{}
+
+    // 6 XOR OFFSET + ZLIB
+    try{
+        return pako.inflate(xorOffset(data, offset));
+    }catch{}
+
+    return null;
 }
 
 async function start(){
@@ -157,70 +184,51 @@ async function start(){
 
     log("Index leído");
 
-    // 🔍 ANALIZAMOS PRIMER ARCHIVO
+    // DEBUG PRIMER ARCHIVO
     let test = files[0];
     let raw = bytes.slice(test.start, test.start + test.size);
 
-    log("Primer archivo: " + test.name);
     dumpDiv.innerHTML += "RAW:\n" + hexDump(raw) + "\n\n";
-
-    // TEST 1
-    let x1 = xorFull(raw);
-    dumpDiv.innerHTML += "XOR FULL:\n" + hexDump(x1) + "\n\n";
-
-    // TEST 2
-    let x2 = xorOffset(raw, test.start);
-    dumpDiv.innerHTML += "XOR OFFSET:\n" + hexDump(x2) + "\n\n";
-
-    // TRY INFLATE
-    let t1 = tryInflate(x1);
-    let t2 = tryInflate(x2);
-    let t3 = tryInflate(raw);
-
-    log("Test inflate RAW: " + (t3 ? "OK" : "FAIL"));
-    log("Test inflate XOR FULL: " + (t1 ? "OK" : "FAIL"));
-    log("Test inflate XOR OFFSET: " + (t2 ? "OK" : "FAIL"));
-
-    let mode = null;
-
-    if(t1) mode = "xorFull";
-    else if(t2) mode = "xorOffset";
-    else if(t3) mode = "raw";
-
-    if(!mode){
-        log("❌ No se detectó método válido");
-        return;
-    }
-
-    log("✔ Método detectado: " + mode);
 
     let ok=0, fail=0;
 
-    for(let f of files){
+    for(let i=0;i<files.length;i++){
+
+        let f = files[i];
 
         try{
 
             let data = bytes.slice(f.start, f.start + f.size);
 
-            if(mode==="xorFull") data = xorFull(data);
-            if(mode==="xorOffset") data = xorOffset(data, f.start);
+            let out = tryAll(data, f.start);
 
-            let out = pako.inflate(data);
+            if(!out) throw "fail";
 
             let blob = new Blob([out], {type:"image/png"});
             let img = document.createElement("img");
             img.src = URL.createObjectURL(blob);
+            img.title = f.name;
 
             imgDiv.appendChild(img);
+
             ok++;
 
         }catch(e){
             fail++;
+            if(fail < 20){
+                log("Error en " + f.name);
+            }
+        }
+
+        if(i % 50 === 0){
+            await new Promise(r=>setTimeout(r,1));
         }
     }
 
     log("OK: " + ok);
-    log("FAIL: " + fail);
+    log("Errores: " + fail);
+    log("FIN");
+
 }
 
 </script>
