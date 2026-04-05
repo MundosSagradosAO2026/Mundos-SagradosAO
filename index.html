@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Fix Estructura 46</title>
+    <title>Amnerys Suite - Estructura 40 Bytes</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -29,7 +29,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE PRO</div>
+        <div class="logo-title">AMNERYS SUITE v7</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -45,19 +45,19 @@
             <button class="btn" style="background:#666" onclick="saveIni()">Guardar .INI</button>
             <div id="statusInd" style="margin-left:auto">Listo</div>
         </div>
-        <textarea id="editor" spellcheck="false"></textarea>
+        <textarea id="editor" spellcheck="false" placeholder="Carga tu Graficos.ind..."></textarea>
     </div>
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor Grh.tsao (Estructura de 46 bytes)</strong>
+            <strong>Extractor Grh.tsao (Estructura 40 bytes)</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
                 <label>Cargar Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">INICIAR EXTRACCIÓN</button>
+                <button class="btn" id="btnRunUnpack">EXTRAER AHORA</button>
                 <div id="logUnpack">Esperando...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
@@ -75,7 +75,7 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- EDITOR .IND ---
+    // --- LÓGICA EDITOR .IND ---
     const editorArea = document.getElementById('editor');
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
@@ -119,7 +119,7 @@
                 grhs.push({ idx, data });
             }
         });
-        const buffer = new ArrayBuffer(grhs.length * 90 + 100);
+        const buffer = new ArrayBuffer(grhs.length * 85 + 100);
         const view = new DataView(buffer);
         let offset = 0;
         view.setInt32(offset, currentVersion, true); offset += 4;
@@ -141,51 +141,51 @@
         });
         downloadBlob(buffer.slice(0, offset), "Graficos.ind");
     }
-
     function saveIni() { downloadBlob(editorArea.value, "Graficos.ini"); }
     function downloadBlob(content, name) {
         const blob = new Blob([content], { type: "application/octet-stream" });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- UNPACKER CORREGIDO SEGÚN TU VOLCADO BINARIO ---
+    // --- UNPACKER 40 BYTES ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
         if (!dFile) return alert("Carga Grh.tsao");
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Extrayendo...<br>";
+        gall.innerHTML = ""; log.innerHTML = "Analizando estructura de 40 bytes...<br>";
 
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
 
-        // Cabecera real (6 bytes): 39 07 22 04 db 0c
-        const numFiles = dView.getUint16(2, true); // Tu "22 04" es 1058
+        // Cabecera: 39 07 22 04... 22 04 es NumFiles
+        const numFiles = dView.getUint16(2, true); 
         log.innerHTML += `Archivos: ${numFiles}<br>`;
 
-        let offset = 6; 
-        const recordSize = 46; 
+        // El primer bloque de 40 bytes parece empezar en el byte 6
+        let offset = 6;
+        const recordSize = 40;
+        
+        // Calculamos dónde terminan todos los nombres para saber dónde empiezan las imágenes
+        let imagesStartPos = offset + (numFiles * recordSize);
+        let currentImagePos = imagesStartPos;
         let count = 0;
 
         for (let i = 0; i < numFiles; i++) {
             if (offset + recordSize > dBuf.byteLength) break;
 
-            // Según tu volcado:
-            // Byte 0-3: StartPos (ab 35 02 00)
-            // Byte 4-7: CompressedSize (51 04 00 00)
-            // Byte 8-39: Nombre (31 2e 70 6e 67 -> 1.png)
-            // Byte 40-43: UncompressedSize (84 04 00 00)
-
-            const startPos = dView.getUint32(offset, true);
-            const compressedSize = dView.getUint32(offset + 4, true);
-            
+            // [0-3] Tamaño comprimido
+            // [4-7] Tamaño descomprimido
+            // [8-39] Nombre
+            const compSize = dView.getUint32(offset, true);
+            const uncompSize = dView.getUint32(offset + 4, true);
             const nameBytes = new Uint8Array(dBuf, offset + 8, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
 
-            if (fName.includes('.png') && compressedSize > 0 && startPos + compressedSize <= dBytes.length) {
+            if (fName.toLowerCase().includes('.png') && compSize > 0 && currentImagePos + compSize <= dBytes.length) {
                 try {
-                    const chunk = dBytes.slice(startPos, startPos + compressedSize);
+                    const chunk = dBytes.slice(currentImagePos, currentImagePos + compSize);
                     const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
                     
@@ -195,11 +195,13 @@
                     gall.appendChild(div);
                     count++;
                 } catch (e) { }
+                // Avanzamos el puntero de imagen
+                currentImagePos += compSize;
             }
 
             offset += recordSize;
             if (i % 200 === 0) {
-                log.innerHTML = `Leídos: ${i} / ${numFiles} (Extraídos: ${count})`;
+                log.innerHTML = `Procesando: ${i} / ${numFiles} (Extraídos: ${count})`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
