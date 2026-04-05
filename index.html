@@ -2,108 +2,115 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Indexer - Recuperación Binaria</title>
+    <title>Amnerys Indexer PRO - Descarga Corregida</title>
     <style>
-        body { font-family: 'Consolas', monospace; background: #0d0d0d; color: #00ff00; margin: 20px; }
-        .container { max-width: 900px; margin: auto; background: #1a1a1a; padding: 20px; border: 1px solid #00ff00; border-radius: 5px; }
-        .upload-area { border: 2px dashed #00ff00; padding: 40px; text-align: center; cursor: pointer; margin-bottom: 20px; }
-        #log { background: #000; padding: 15px; height: 300px; overflow-y: auto; border: 1px solid #333; font-size: 12px; white-space: pre-wrap; }
-        .btn { background: #00ff00; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .btn:disabled { background: #004400; color: #008800; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; margin: 20px; text-align: center; }
+        .container { max-width: 800px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; border: 1px solid #333; }
+        h1 { color: #00adb5; }
+        .box { border: 2px dashed #444; padding: 40px; margin: 15px 0; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .box:hover { border-color: #00adb5; background: #252525; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 5px; background: #000; font-family: monospace; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; color: #0f0; }
+        .download-btn { background: #ff4d4d; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 20px; display: none; width: 100%; }
+        .download-btn:hover { background: #ff2e2e; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>AMNERYS BINARY DECODER</h2>
-    <p style="color: #888;">Estructura: Little-Endian | Headers: Long | Coords: Integer</p>
+    <h1>Amnerys Graphics Tools</h1>
+    <p>Conversor de .IND a .INI (Estructura Binaria Estándar)</p>
 
-    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-        SOLTAR GRAFICOS.IND AQUÍ O HACER CLIC
-        <input type="file" id="fileInput" hidden accept=".ind">
+    <div class="box" onclick="document.getElementById('indInput').click()">
+        <strong>HAGA CLIC AQUÍ PARA CARGAR GRAFICOS.IND</strong>
+        <input type="file" id="indInput" hidden accept=".ind">
     </div>
 
-    <div id="log">Esperando archivo binario...</div>
-    <div id="downloadArea"></div>
+    <div id="status">Esperando archivo...</div>
+    
+    <button id="finalDownloadBtn" class="download-btn">DESCARGAR GRAFICOS.INI</button>
 </div>
 
 <script>
-    const fileInput = document.getElementById('fileInput');
-    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+    const downloadBtn = document.getElementById('finalDownloadBtn');
 
-    fileInput.onchange = async (e) => {
+    function log(msg) {
+        status.innerHTML += `> ${msg}<br>`;
+        status.scrollTop = status.scrollHeight;
+    }
+
+    document.getElementById('indInput').onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        log.innerHTML = `> Analizando: ${file.name}\n`;
+        downloadBtn.style.display = "none";
+        status.innerHTML = "";
+        log(`Leyendo binario: ${file.name}...`);
+
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
         let offset = 0;
 
         try {
-            // CABECERA (8 bytes iniciales)
             const version = view.getInt32(offset, true); offset += 4;
             const grhCount = view.getInt32(offset, true); offset += 4;
 
-            log.innerHTML += `> Versión: ${version} | Registros: ${grhCount}\n`;
+            log(`Versión: ${version} | Total: ${grhCount} registros.`);
 
-            let iniRows = [];
-            iniRows.push("[INIT]");
-            iniRows.push(`NumGrh=${grhCount}`);
-            iniRows.push(`Version=${version}\n`);
-            iniRows.push("[Graphics]");
-
+            let iniData = `[INIT]\nNumGrh=${grhCount}\nVersion=${version}\n\n[Graphics]\n`;
             let count = 0;
 
-            // PROCESAMIENTO DE REGISTROS
-            // Usamos un bucle basado en la longitud del archivo para evitar desbordamientos
-            while (offset + 4 <= buffer.byteLength) {
-                const grhIndex = view.getInt32(offset, true); offset += 4;
+            while (offset < buffer.byteLength) {
+                if (offset + 4 > buffer.byteLength) break;
                 
+                const grhIndex = view.getInt32(offset, true); offset += 4;
                 if (grhIndex <= 0) break;
 
                 const numFrames = view.getInt16(offset, true); offset += 2;
 
                 if (numFrames === 1) {
-                    // Gráfico Simple (14 bytes adicionales)
                     const fileNum = view.getInt32(offset, true); offset += 4;
                     const sX = view.getInt16(offset, true); offset += 2;
                     const sY = view.getInt16(offset, true); offset += 2;
                     const width = view.getInt16(offset, true); offset += 2;
                     const height = view.getInt16(offset, true); offset += 2;
-
-                    iniRows.push(`Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}`);
+                    iniData += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
                 } else {
-                    // Animación
                     let frames = [];
-                    for(let i = 0; i < numFrames; i++) {
+                    for(let i=0; i<numFrames; i++) {
                         frames.push(view.getInt32(offset, true));
                         offset += 4;
                     }
-                    // Velocidad (Single - 4 bytes)
                     const speed = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, "");
                     offset += 4;
-                    iniRows.push(`Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}`);
+                    iniData += `Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}\n`;
                 }
-
                 count++;
-                if (count % 2000 === 0) log.innerHTML += `> Procesando... (${count})\n`;
+                if (count % 5000 === 0) log(`Procesados ${count}...`);
             }
 
-            log.innerHTML += `> ¡Éxito! ${count} registros decodificados.\n`;
+            log(`Terminado. Generando archivo de descarga...`);
+
+            // MÉTODO DE DESCARGA FORZADA
+            const blob = new Blob([iniData], { type: 'text/plain;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
             
-            // Crear descarga
-            const blob = new Blob([iniRows.join('\n')], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            document.getElementById('downloadArea').innerHTML = `
-                <button class="btn" onclick="window.location.href='${url}'" download="Graficos.ini">
-                    DESCARGAR RECONSTRUIDO .INI
-                </button>`;
+            downloadBtn.style.display = "block";
+            downloadBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'Graficos.ini';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            };
 
         } catch (err) {
-            log.innerHTML += `\n!!! ERROR DE DESFASE: El archivo binario no sigue el patrón esperado.\n`;
-            log.innerHTML += `Detalle: ${err.message}\n`;
-            log.innerHTML += `Último Offset: ${offset}\n`;
+            log(`Error crítico: ${err.message}`);
         }
     };
 </script>
