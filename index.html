@@ -2,113 +2,108 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Indexer PRO - Fixed</title>
+    <title>Amnerys Indexer - Recuperación Binaria</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; margin: 20px; text-align: center; }
-        .container { max-width: 850px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; border: 1px solid #333; }
-        h1 { color: #00adb5; }
-        .box { border: 2px dashed #444; padding: 30px; margin: 15px 0; border-radius: 8px; cursor: pointer; }
-        .box:hover { border-color: #00adb5; background: #252525; }
-        .btn { background: #00adb5; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        #status { margin-top: 20px; padding: 15px; border-radius: 5px; background: #000; font-family: monospace; font-size: 12px; text-align: left; max-height: 250px; overflow-y: auto; color: #0f0; border: 1px solid #333; }
+        body { font-family: 'Consolas', monospace; background: #0d0d0d; color: #00ff00; margin: 20px; }
+        .container { max-width: 900px; margin: auto; background: #1a1a1a; padding: 20px; border: 1px solid #00ff00; border-radius: 5px; }
+        .upload-area { border: 2px dashed #00ff00; padding: 40px; text-align: center; cursor: pointer; margin-bottom: 20px; }
+        #log { background: #000; padding: 15px; height: 300px; overflow-y: auto; border: 1px solid #333; font-size: 12px; white-space: pre-wrap; }
+        .btn { background: #00ff00; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .btn:disabled { background: #004400; color: #008800; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Amnerys Graphics Tools</h1>
-    <p>Si el error persiste, es probable que tu .ind use Integers (2 bytes) en lugar de Longs.</p>
+    <h2>AMNERYS BINARY DECODER</h2>
+    <p style="color: #888;">Estructura: Little-Endian | Headers: Long | Coords: Integer</p>
 
-    <div class="box" onclick="document.getElementById('indInput').click()">
-        <strong>Cargar Graficos.ind</strong>
-        <input type="file" id="indInput" hidden accept=".ind">
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+        SOLTAR GRAFICOS.IND AQUÍ O HACER CLIC
+        <input type="file" id="fileInput" hidden accept=".ind">
     </div>
 
-    <div id="status">Consola lista.</div>
-    <div id="actions"></div>
+    <div id="log">Esperando archivo binario...</div>
+    <div id="downloadArea"></div>
 </div>
 
 <script>
-    const status = document.getElementById('status');
-    const actions = document.getElementById('actions');
+    const fileInput = document.getElementById('fileInput');
+    const log = document.getElementById('log');
 
-    function log(msg, error = false) {
-        const color = error ? "#ff4d4d" : "#0f0";
-        status.innerHTML += `> <span style="color:${color}">${msg}</span><br>`;
-        status.scrollTop = status.scrollHeight;
-    }
-
-    document.getElementById('indInput').onchange = async (e) => {
+    fileInput.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
-        status.innerHTML = "";
-        log(`Iniciando lectura de ${file.name}...`);
-        
+
+        log.innerHTML = `> Analizando: ${file.name}\n`;
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
         let offset = 0;
 
         try {
-            // Intentar leer cabecera estándar (4+4 bytes)
-            // Algunos .ind usan Integer (2 bytes) para el total de Grhs.
+            // CABECERA (8 bytes iniciales)
             const version = view.getInt32(offset, true); offset += 4;
             const grhCount = view.getInt32(offset, true); offset += 4;
-            
-            log(`Versión detectada: ${version}`);
-            log(`Total Grhs declarado: ${grhCount}`);
 
-            let ini = `[INIT]\nNumGrh=${grhCount}\nVersion=${version}\n\n[Graphics]\n`;
+            log.innerHTML += `> Versión: ${version} | Registros: ${grhCount}\n`;
+
+            let iniRows = [];
+            iniRows.push("[INIT]");
+            iniRows.push(`NumGrh=${grhCount}`);
+            iniRows.push(`Version=${version}\n`);
+            iniRows.push("[Graphics]");
+
             let count = 0;
 
-            // Saltamos el primer puntero si existe (4 bytes adicionales en algunas versiones)
-            // offset += 4; 
-
-            while (offset < buffer.byteLength) {
-                if (offset + 4 > buffer.byteLength) break;
-                
+            // PROCESAMIENTO DE REGISTROS
+            // Usamos un bucle basado en la longitud del archivo para evitar desbordamientos
+            while (offset + 4 <= buffer.byteLength) {
                 const grhIndex = view.getInt32(offset, true); offset += 4;
+                
                 if (grhIndex <= 0) break;
 
-                const numFrames = view.getInt16(offset, true); offset += 2; // USAMOS INT16 (2 bytes)
+                const numFrames = view.getInt16(offset, true); offset += 2;
 
                 if (numFrames === 1) {
-                    // Gráfico simple: File(4), X(2), Y(2), W(2), H(2) -> Total 12 bytes
-                    // NOTA: Si tu motor es puramente 32 bits, cambia los getInt16 por getInt32
+                    // Gráfico Simple (14 bytes adicionales)
                     const fileNum = view.getInt32(offset, true); offset += 4;
                     const sX = view.getInt16(offset, true); offset += 2;
                     const sY = view.getInt16(offset, true); offset += 2;
                     const width = view.getInt16(offset, true); offset += 2;
                     const height = view.getInt16(offset, true); offset += 2;
 
-                    ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
+                    iniRows.push(`Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}`);
                 } else {
                     // Animación
                     let frames = [];
-                    for(let i=0; i < numFrames; i++) {
-                        frames.push(view.getInt32(offset, true)); 
+                    for(let i = 0; i < numFrames; i++) {
+                        frames.push(view.getInt32(offset, true));
                         offset += 4;
                     }
+                    // Velocidad (Single - 4 bytes)
                     const speed = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, "");
                     offset += 4;
-                    ini += `Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}\n`;
+                    iniRows.push(`Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}`);
                 }
+
                 count++;
-                
-                if(count > 50000) { // Safety break
-                    log("Error: Bucle infinito detectado (formato de bytes incorrecto)", true);
-                    break;
-                }
+                if (count % 2000 === 0) log.innerHTML += `> Procesando... (${count})\n`;
             }
 
-            log(`Éxito: ${count} registros procesados.`);
-            const blob = new Blob([ini], { type: 'text/plain' });
+            log.innerHTML += `> ¡Éxito! ${count} registros decodificados.\n`;
+            
+            // Crear descarga
+            const blob = new Blob([iniRows.join('\n')], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
-            actions.innerHTML = `<button class="btn" onclick="window.location.href='${url}'" download="Graficos.ini">Descargar Graficos.ini</button>`;
+            document.getElementById('downloadArea').innerHTML = `
+                <button class="btn" onclick="window.location.href='${url}'" download="Graficos.ini">
+                    DESCARGAR RECONSTRUIDO .INI
+                </button>`;
 
-        } catch(err) {
-            log(`ERROR DE LECTURA: El formato binario no coincide con la estructura esperada.`, true);
-            log(`Detalle: ${err.message}`, true);
+        } catch (err) {
+            log.innerHTML += `\n!!! ERROR DE DESFASE: El archivo binario no sigue el patrón esperado.\n`;
+            log.innerHTML += `Detalle: ${err.message}\n`;
+            log.innerHTML += `Último Offset: ${offset}\n`;
         }
     };
 </script>
