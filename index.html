@@ -1,191 +1,69 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSAO Viewer</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-<style>
-body {
-    background: #0b0b0b;
-    color: #00ffcc;
-    font-family: monospace;
-    padding: 20px;
-}
-
-button {
-    background: #00ffcc;
-    border: none;
-    padding: 10px;
-    margin-top: 10px;
-    cursor: pointer;
-}
-
-#log {
-    background: #000;
-    padding: 10px;
-    height: 150px;
-    overflow: auto;
-    border: 1px solid #333;
-    margin-top: 10px;
-}
-
-#imagenes {
-    margin-top: 20px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.imgBox {
-    background: #111;
-    padding: 5px;
-    border: 1px solid #333;
-    text-align: center;
-}
-
-.imgBox img {
-    max-width: 120px;
-    display: block;
-}
-</style>
+<title>Detector XOR TSAO</title>
 </head>
+<body style="background:#000;color:#0f0;font-family:monospace">
 
-<body>
-
-<h2>Extractor PNG de .tsao (con visor)</h2>
-
-<input type="file" id="fileInput">
-<button id="startBtn">EXTRAER Y MOSTRAR</button>
-<button id="downloadBtn" style="display:none;">DESCARGAR ZIP</button>
-
+<input type="file" id="file">
 <div id="log"></div>
-<div id="imagenes"></div>
+<div id="imgs"></div>
 
 <script>
-const logDiv = document.getElementById("log");
-const imgDiv = document.getElementById("imagenes");
-const startBtn = document.getElementById("startBtn");
-const downloadBtn = document.getElementById("downloadBtn");
+const log = (t)=>document.getElementById("log").innerHTML += "> "+t+"<br>";
 
-let zip = new JSZip();
+document.getElementById("file").onchange = async e => {
 
-function log(text){
-    let p = document.createElement("div");
-    p.textContent = "> " + text;
-    logDiv.appendChild(p);
-    logDiv.scrollTop = logDiv.scrollHeight;
-}
+    let file = e.target.files[0];
+    let buffer = await file.arrayBuffer();
+    let bytes = new Uint8Array(buffer);
 
-startBtn.onclick = async () => {
+    log("Archivo cargado");
 
-    const file = document.getElementById("fileInput").files[0];
-    if(!file){
-        alert("Seleccioná un .tsao");
-        return;
-    }
+    const pngSig = [0x89,0x50,0x4E,0x47];
 
-    logDiv.innerHTML = "";
-    imgDiv.innerHTML = "";
-    zip = new JSZip();
-    startBtn.disabled = true;
-    downloadBtn.style.display = "none";
+    // probar XOR 0-255
+    for(let key=0; key<256; key++){
 
-    log("Cargando archivo...");
+        for(let i=0;i<100000;i++){ // solo primeras posiciones
 
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
+            let ok = true;
 
-    log("Tamaño: " + (bytes.length / 1024 / 1024).toFixed(2) + " MB");
-
-    const startSig = [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A];
-    const endSig   = [0x49,0x45,0x4E,0x44,0xAE,0x42,0x60,0x82];
-
-    let found = 0;
-
-    log("Buscando PNG...");
-
-    for(let i = 0; i < bytes.length - 8; i++){
-
-        if(startSig.every((b,j)=>bytes[i+j]===b)){
-
-            let end = -1;
-
-            for(let j = i; j < bytes.length - 8; j++){
-                if(endSig.every((b,k)=>bytes[j+k]===b)){
-                    end = j + 8;
+            for(let j=0;j<4;j++){
+                if((bytes[i+j] ^ key) !== pngSig[j]){
+                    ok = false;
                     break;
                 }
             }
 
-            if(end !== -1){
+            if(ok){
+                log("🔥 POSIBLE XOR KEY: " + key);
 
-                let png = bytes.slice(i, end);
-                let blob = new Blob([png], {type:"image/png"});
+                // reconstruir archivo XOR completo
+                let decoded = new Uint8Array(bytes.length);
+
+                for(let k=0;k<bytes.length;k++){
+                    decoded[k] = bytes[k] ^ key;
+                }
+
+                // mostrar imagen desde inicio detectado
+                let blob = new Blob([decoded.slice(i, i+50000)], {type:"image/png"});
                 let url = URL.createObjectURL(blob);
-
-                // mostrar imagen
-                let box = document.createElement("div");
-                box.className = "imgBox";
 
                 let img = document.createElement("img");
                 img.src = url;
+                img.style.width = "200px";
 
-                let label = document.createElement("div");
-                label.textContent = "img_" + found + ".png";
+                document.getElementById("imgs").appendChild(img);
 
-                let btn = document.createElement("a");
-                btn.href = url;
-                btn.download = "img_" + found + ".png";
-                btn.textContent = "Descargar";
-
-                box.appendChild(img);
-                box.appendChild(label);
-                box.appendChild(btn);
-
-                imgDiv.appendChild(box);
-
-                // agregar al zip
-                zip.file("img_" + found + ".png", png);
-
-                found++;
-                i = end;
+                return;
             }
         }
-
-        if(i % 2000000 === 0){
-            log("Progreso: " + ((i / bytes.length)*100).toFixed(1) + "%");
-            await new Promise(r => setTimeout(r, 1));
-        }
     }
 
-    log("Total encontrados: " + found);
-
-    if(found === 0){
-        log("⚠ No se encontraron PNG");
-        startBtn.disabled = false;
-        return;
-    }
-
-    log("Generando ZIP...");
-
-    const content = await zip.generateAsync({type:"blob"});
-    const urlZip = URL.createObjectURL(content);
-
-    downloadBtn.onclick = () => {
-        let a = document.createElement("a");
-        a.href = urlZip;
-        a.download = "imagenes_tsao.zip";
-        a.click();
-    };
-
-    downloadBtn.style.display = "block";
-    startBtn.disabled = false;
-
-    log("✔ Listo");
+    log("No se encontró XOR simple");
 };
-
 </script>
 
 </body>
