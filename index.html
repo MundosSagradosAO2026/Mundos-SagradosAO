@@ -2,8 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Estructura 40 Bytes</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <title>Amnerys Suite v8 - Signature Scanner</title>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
         #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
@@ -16,9 +15,9 @@
         #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; }
         .unpacker-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; flex: 1; overflow: hidden; }
         .side-panel { background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; gap: 10px; }
-        .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-        .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; }
-        .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; background: #222; }
+        .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        .img-card { background: #111; border: 1px solid #444; padding: 8px; text-align: center; font-size: 11px; color: #eee; border-radius: 4px; }
+        .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; background: #222; margin-bottom: 5px; }
         .btn { padding: 8px 15px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
         .btn-save { background: #28a745; }
         .btn-back { background: #ff4d4d; }
@@ -29,7 +28,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE v7</div>
+        <div class="logo-title">AMNERYS SUITE v8</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -45,28 +44,26 @@
             <button class="btn" style="background:#666" onclick="saveIni()">Guardar .INI</button>
             <div id="statusInd" style="margin-left:auto">Listo</div>
         </div>
-        <textarea id="editor" spellcheck="false" placeholder="Carga tu Graficos.ind..."></textarea>
+        <textarea id="editor" spellcheck="false" placeholder="Carga tu archivo de índices..."></textarea>
     </div>
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor Grh.tsao (Estructura 40 bytes)</strong>
+            <strong>Extractor Inteligente (Firma PNG Detectada)</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
-                <label>Cargar Grh.tsao:</label>
+                <label>Archivo .tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">EXTRAER AHORA</button>
-                <div id="logUnpack">Esperando...</div>
+                <button class="btn" id="btnRunUnpack">ESCANEAR Y EXTRAER</button>
+                <div id="logUnpack">Esperando archivo...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
         </div>
     </div>
 
 <script>
-    let currentVersion = 0;
-
     function showView(id) {
         document.getElementById('mainMenu').classList.add('hidden');
         document.getElementById('editorContainer').style.display = 'none';
@@ -75,8 +72,10 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- LÓGICA EDITOR .IND ---
+    // --- EDITOR .IND ---
+    let currentVersion = 0;
     const editorArea = document.getElementById('editor');
+
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
         const buffer = await file.arrayBuffer();
@@ -105,6 +104,7 @@
             }
         }
         editorArea.value = text;
+        document.getElementById('statusInd').innerText = `Grhs: ${total}`;
     };
 
     function saveInd() {
@@ -119,7 +119,7 @@
                 grhs.push({ idx, data });
             }
         });
-        const buffer = new ArrayBuffer(grhs.length * 85 + 100);
+        const buffer = new ArrayBuffer(grhs.length * 90 + 100);
         const view = new DataView(buffer);
         let offset = 0;
         view.setInt32(offset, currentVersion, true); offset += 4;
@@ -141,71 +141,69 @@
         });
         downloadBlob(buffer.slice(0, offset), "Graficos.ind");
     }
+
     function saveIni() { downloadBlob(editorArea.value, "Graficos.ini"); }
     function downloadBlob(content, name) {
         const blob = new Blob([content], { type: "application/octet-stream" });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- UNPACKER 40 BYTES ---
+    // --- UNPACKER POR FIRMA BINARIA ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
-        if (!dFile) return alert("Carga Grh.tsao");
+        if (!dFile) return alert("Selecciona el archivo de datos");
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Analizando estructura de 40 bytes...<br>";
+        gall.innerHTML = ""; log.innerHTML = "Escaneando firmas PNG...<br>";
 
         const dBuf = await dFile.arrayBuffer();
-        const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
-
-        // Cabecera: 39 07 22 04... 22 04 es NumFiles
-        const numFiles = dView.getUint16(2, true); 
-        log.innerHTML += `Archivos: ${numFiles}<br>`;
-
-        // El primer bloque de 40 bytes parece empezar en el byte 6
-        let offset = 6;
-        const recordSize = 40;
-        
-        // Calculamos dónde terminan todos los nombres para saber dónde empiezan las imágenes
-        let imagesStartPos = offset + (numFiles * recordSize);
-        let currentImagePos = imagesStartPos;
         let count = 0;
 
-        for (let i = 0; i < numFiles; i++) {
-            if (offset + recordSize > dBuf.byteLength) break;
+        // Firma PNG: 89 50 4E 47 0D 0A 1A 0A
+        const signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        
+        for (let i = 0; i < dBytes.length - 8; i++) {
+            // Buscamos el inicio de un PNG
+            let match = true;
+            for (let j = 0; j < 8; j++) {
+                if (dBytes[i + j] !== signature[j]) {
+                    match = false;
+                    break;
+                }
+            }
 
-            // [0-3] Tamaño comprimido
-            // [4-7] Tamaño descomprimido
-            // [8-39] Nombre
-            const compSize = dView.getUint32(offset, true);
-            const uncompSize = dView.getUint32(offset + 4, true);
-            const nameBytes = new Uint8Array(dBuf, offset + 8, 32);
-            let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
+            if (match) {
+                // Hemos encontrado un PNG en la posición i
+                // Ahora buscamos el final (IEND): 49 45 4E 44 AE 42 60 82
+                let endPos = -1;
+                for (let k = i; k < Math.min(i + 1000000, dBytes.length - 8); k++) { // Máximo 1MB por imagen
+                    if (dBytes[k] === 0x49 && dBytes[k+1] === 0x45 && dBytes[k+2] === 0x4E && dBytes[k+3] === 0x44) {
+                        endPos = k + 8; // El bloque IEND mide 8-12 bytes usualmente
+                        break;
+                    }
+                }
 
-            if (fName.toLowerCase().includes('.png') && compSize > 0 && currentImagePos + compSize <= dBytes.length) {
-                try {
-                    const chunk = dBytes.slice(currentImagePos, currentImagePos + compSize);
-                    const unzipped = pako.inflate(chunk);
-                    const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
+                if (endPos > i) {
+                    const pngBlob = dBytes.slice(i, endPos);
+                    const url = URL.createObjectURL(new Blob([pngBlob], {type: 'image/png'}));
                     
                     const div = document.createElement('div');
                     div.className = 'img-card';
-                    div.innerHTML = `<img src="${url}"><br>${fName}`;
+                    div.innerHTML = `<img src="${url}"><br>G_${count + 1}`;
                     gall.appendChild(div);
+                    
                     count++;
-                } catch (e) { }
-                // Avanzamos el puntero de imagen
-                currentImagePos += compSize;
+                    i = endPos; // Saltamos al final de esta imagen para buscar la siguiente
+                }
             }
 
-            offset += recordSize;
-            if (i % 200 === 0) {
-                log.innerHTML = `Procesando: ${i} / ${numFiles} (Extraídos: ${count})`;
+            if (i % 500000 === 0) {
+                log.innerHTML = `Escaneado: ${((i/dBytes.length)*100).toFixed(1)}%...`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = `<strong>Finalizado: ${count} imágenes recuperadas.</strong>`;
+        log.innerHTML = `<strong>Éxito: ${count} imágenes extraídas.</strong>`;
     };
 </script>
 </body>
