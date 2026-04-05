@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>TSao Extractor FINAL</title>
+<title>Extractor TSao FINAL PRO</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
@@ -35,16 +35,6 @@ img{
     width:100px;
     border:1px solid #333;
 }
-
-#dump{
-    background:#111;
-    color:#0ff;
-    height:150px;
-    overflow:auto;
-    margin-top:10px;
-    padding:10px;
-    font-size:11px;
-}
 </style>
 </head>
 
@@ -57,13 +47,11 @@ img{
 <button onclick="start()">EXTRAER</button>
 
 <div id="log"></div>
-<div id="dump"></div>
 <div id="images"></div>
 
 <script>
 
 const logDiv = document.getElementById("log");
-const dumpDiv = document.getElementById("dump");
 const imgDiv = document.getElementById("images");
 
 function log(t){
@@ -71,15 +59,7 @@ function log(t){
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-function hexDump(arr, max=64){
-    let s="";
-    for(let i=0;i<Math.min(arr.length,max);i++){
-        s += arr[i].toString(16).padStart(2,"0")+" ";
-    }
-    return s;
-}
-
-// clave VB6
+// clave (por si hay XOR)
 const keyStr = "quierovalecuatro";
 const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
 
@@ -108,37 +88,53 @@ function xorOffset(data, offset){
     return out;
 }
 
+// 🔍 busca inicio real dentro del bloque
+function findRealStart(data){
+
+    for(let i=0;i<32;i++){
+
+        // PNG
+        if(data[i] === 0x89 && data[i+1] === 0x50 && data[i+2] === 0x4E){
+            return i;
+        }
+
+        // ZLIB
+        if(data[i] === 0x78 && (
+            data[i+1] === 0x9C ||
+            data[i+1] === 0xDA ||
+            data[i+1] === 0x01
+        )){
+            return i;
+        }
+
+        // RAW DEFLATE (heurística)
+        if(
+            data[i] === 0x63 ||
+            data[i] === 0xED ||
+            data[i] === 0x0B ||
+            data[i] === 0x73
+        ){
+            return i;
+        }
+    }
+
+    return 0;
+}
+
+// 💥 prueba todos los métodos
 function tryAll(data, offset){
 
-    // 1 RAW DEFLATE
-    try{
-        return pako.inflateRaw(data);
-    }catch{}
+    // PNG directo
+    if(data[0] === 0x89 && data[1] === 0x50){
+        return data;
+    }
 
-    // 2 ZLIB
-    try{
-        return pako.inflate(data);
-    }catch{}
-
-    // 3 XOR FULL + RAW
-    try{
-        return pako.inflateRaw(xorFull(data));
-    }catch{}
-
-    // 4 XOR FULL + ZLIB
-    try{
-        return pako.inflate(xorFull(data));
-    }catch{}
-
-    // 5 XOR OFFSET + RAW
-    try{
-        return pako.inflateRaw(xorOffset(data, offset));
-    }catch{}
-
-    // 6 XOR OFFSET + ZLIB
-    try{
-        return pako.inflate(xorOffset(data, offset));
-    }catch{}
+    try{ return pako.inflateRaw(data); }catch{}
+    try{ return pako.inflate(data); }catch{}
+    try{ return pako.inflateRaw(xorFull(data)); }catch{}
+    try{ return pako.inflate(xorFull(data)); }catch{}
+    try{ return pako.inflateRaw(xorOffset(data, offset)); }catch{}
+    try{ return pako.inflate(xorOffset(data, offset)); }catch{}
 
     return null;
 }
@@ -147,7 +143,6 @@ async function start(){
 
     imgDiv.innerHTML="";
     logDiv.innerHTML="";
-    dumpDiv.innerHTML="";
 
     const file = document.getElementById("fileInput").files[0];
     if(!file) return alert("Seleccioná archivo");
@@ -184,13 +179,8 @@ async function start(){
 
     log("Index leído");
 
-    // DEBUG PRIMER ARCHIVO
-    let test = files[0];
-    let raw = bytes.slice(test.start, test.start + test.size);
-
-    dumpDiv.innerHTML += "RAW:\n" + hexDump(raw) + "\n\n";
-
-    let ok=0, fail=0;
+    let ok = 0;
+    let fail = 0;
 
     for(let i=0;i<files.length;i++){
 
@@ -198,14 +188,21 @@ async function start(){
 
         try{
 
-            let data = bytes.slice(f.start, f.start + f.size);
+            // leer bloque
+            let raw = bytes.slice(f.start, f.start + f.size);
 
+            // encontrar inicio real
+            let shift = findRealStart(raw);
+            let data = raw.slice(shift);
+
+            // intentar decodificar
             let out = tryAll(data, f.start);
 
             if(!out) throw "fail";
 
             let blob = new Blob([out], {type:"image/png"});
             let img = document.createElement("img");
+
             img.src = URL.createObjectURL(blob);
             img.title = f.name;
 
@@ -228,7 +225,6 @@ async function start(){
     log("OK: " + ok);
     log("Errores: " + fail);
     log("FIN");
-
 }
 
 </script>
