@@ -13,13 +13,14 @@
         .card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; }
         .view-container { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
         .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
-        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; }
+        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; margin-bottom: 10px; }
         .unpacker-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; flex: 1; overflow: hidden; }
         .side-panel { background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; gap: 15px; }
         .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
         .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; border-radius: 4px; }
         .img-card img { max-width: 100px; height: auto; image-rendering: pixelated; background: #222; }
         .btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
+        .btn-ini { background: #444; }
         .btn-back { background: #ff4d4d; }
         #logUnpack { background:#000; padding:10px; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; color:#0f0; }
         .hidden { display: none !important; }
@@ -33,10 +34,12 @@
             <div class="card" onclick="showView('editorContainer')">
                 <span>🖼️</span>
                 <h3>Editor Index (.IND)</h3>
+                <p>Cargar, Editar y Guardar</p>
             </div>
             <div class="card" onclick="showView('unpackerContainer')">
                 <span>📦</span>
                 <h3>Unpacker (.TSAO)</h3>
+                <p>Extraer imágenes reales</p>
             </div>
         </div>
     </div>
@@ -46,15 +49,17 @@
             <button class="btn btn-back" onclick="showView('mainMenu')">← Volver</button>
             <input type="file" id="loadInd" style="display:none">
             <button class="btn" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
-            <div id="statusInd" style="color: #888; font-size: 12px; margin-left: auto;">Listo</div>
+            <button class="btn" onclick="saveInd()">Descargar .IND</button>
+            <button class="btn btn-ini" onclick="saveIni()">Descargar .INI</button>
+            <div id="statusInd" style="color: #888; font-size: 12px; margin-left: auto;">Esperando archivo...</div>
         </div>
-        <textarea id="editor" placeholder="Carga un archivo .ind para editar..."></textarea>
+        <textarea id="editor" spellcheck="false" placeholder="[INIT]..."></textarea>
     </div>
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">← Volver</button>
-            <strong>Desencriptador de Gráficos</strong>
+            <strong>Desencriptador de Recursos</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
@@ -63,13 +68,15 @@
                 <label>Grh.tsao:</label>
                 <input type="file" id="fileData">
                 <button class="btn" id="btnRunUnpack">EXTRAER IMÁGENES</button>
-                <div id="logUnpack">Esperando...</div>
+                <div id="logUnpack">Listo...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
         </div>
     </div>
 
 <script>
+    let currentVersion = 0;
+
     // --- NAVEGACIÓN ---
     function showView(id) {
         document.getElementById('mainMenu').classList.add('hidden');
@@ -79,16 +86,19 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- LÓGICA DEL EDITOR .IND (TUYA) ---
-    const editor = document.getElementById('editor');
+    // --- LÓGICA EDITOR .IND ---
+    const editorArea = document.getElementById('editor');
+
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
         let offset = 0;
-        let version = view.getInt32(offset, true); offset += 4;
+        
+        currentVersion = view.getInt32(offset, true); offset += 4;
         const total = view.getInt32(offset, true); offset += 4;
-        let text = `[INIT]\nNumGrh=${total}\nVersion=${version}\n\n[Graphics]\n`;
+        
+        let text = `[INIT]\nNumGrh=${total}\nVersion=${currentVersion}\n\n[Graphics]\n`;
         
         try {
             while (offset < buffer.byteLength) {
@@ -110,12 +120,70 @@
                     text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
                 }
             }
-            editor.value = text;
-            document.getElementById('statusInd').innerText = `Cargados: ${total}`;
-        } catch(err) { alert("Error leyendo .ind"); }
+            editorArea.value = text;
+            document.getElementById('statusInd').innerText = `Registros: ${total}`;
+        } catch(err) { alert("Error procesando binario."); }
     };
 
-    // --- LÓGICA DEL UNPACKER (CORREGIDA) ---
+    function saveInd() {
+        const lines = editorArea.value.split('\n');
+        let grhs = [];
+        let numGrh = 0;
+        let ver = currentVersion;
+
+        lines.forEach(line => {
+            if (line.startsWith('Version=')) ver = parseInt(line.split('=')[1]);
+            if (line.startsWith('NumGrh=')) numGrh = parseInt(line.split('=')[1]);
+            if (line.startsWith('Grh')) {
+                const parts = line.split('=');
+                const idx = parseInt(parts[0].replace('Grh', ''));
+                const data = parts[1].split('-');
+                grhs.push({ idx, data });
+            }
+        });
+
+        // Crear Buffer (Tamaño estimado generoso)
+        const buffer = new ArrayBuffer(grhs.length * 80 + 100);
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        view.setInt32(offset, ver, true); offset += 4;
+        view.setInt32(offset, numGrh || grhs.length, true); offset += 4;
+
+        grhs.forEach(g => {
+            view.setInt32(offset, g.idx, true); offset += 4;
+            const frames = parseInt(g.data[0]);
+            view.setInt16(offset, frames, true); offset += 2;
+            if (frames === 1) {
+                view.setInt32(offset, parseInt(g.data[1]), true); offset += 4;
+                view.setInt16(offset, parseInt(g.data[2]), true); offset += 2;
+                view.setInt16(offset, parseInt(g.data[3]), true); offset += 2;
+                view.setInt16(offset, parseInt(g.data[4]), true); offset += 2;
+                view.setInt16(offset, parseInt(g.data[5]), true); offset += 2;
+            } else {
+                for(let i=1; i<=frames; i++) {
+                    view.setInt32(offset, parseInt(g.data[i]), true); offset += 4;
+                }
+                view.setFloat32(offset, parseFloat(g.data[frames+1]), true); offset += 4;
+            }
+        });
+
+        download(buffer.slice(0, offset), "Graficos.ind", "application/octet-stream");
+    }
+
+    function saveIni() {
+        download(editorArea.value, "Graficos.ini", "text/plain");
+    }
+
+    function download(content, name, type) {
+        const blob = new Blob([content], { type: type });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+    }
+
+    // --- LÓGICA DEL UNPACKER TSAO ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const pFile = document.getElementById('filePaths').files[0];
         const dFile = document.getElementById('fileData').files[0];
@@ -125,60 +193,48 @@
         if (!pFile || !dFile) return alert("Faltan archivos .tsao");
 
         gall.innerHTML = "";
-        log.innerHTML = "Analizando...<br>";
+        log.innerHTML = "Extrayendo...<br>";
         
         const pBuf = await pFile.arrayBuffer();
         const dBuf = await dFile.arrayBuffer();
         const pView = new DataView(pBuf);
         const dBytes = new Uint8Array(dBuf);
-        
         const key = "quierovalecuatro";
         const datCM = key.split('').map(c => c.charCodeAt(0));
         
-        // Empezamos en el byte 4 (saltando el tamaño inicial)
         let offset = 4;
         const recordSize = 44; 
         const numFiles = Math.floor((pBuf.byteLength - 4) / recordSize);
-
-        log.innerHTML += `Archivos: ${numFiles}<br>`;
 
         for (let i = 0; i < numFiles; i++) {
             let currentOffset = offset + (i * recordSize);
             if(currentOffset + recordSize > pBuf.byteLength) break;
 
-            // Nombre (primeros 32 bytes del bloque)
             let nameBytes = new Uint8Array(pBuf, currentOffset, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
-            
-            // Punteros (después del nombre)
             const startPos = pView.getUint32(currentOffset + 32, true);
             const size = pView.getUint32(currentOffset + 36, true);
 
             if (size > 0 && startPos + size <= dBytes.length) {
                 try {
                     let chunk = dBytes.slice(startPos, startPos + size);
-                    
-                    // Aplicar XOR antes de descompresión
                     for (let j = 0; j < chunk.length; j++) {
                         chunk[j] = chunk[j] ^ datCM[j % datCM.length];
                     }
-
                     const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
-
                     const div = document.createElement('div');
                     div.className = 'img-card';
                     div.innerHTML = `<img src="${url}"><br>${fName}`;
                     gall.appendChild(div);
-                } catch (e) { /* Error de descompresión ignorado */ }
+                } catch (e) {}
             }
-
             if (i % 100 === 0) {
                 log.innerHTML = `Extrayendo: ${i} / ${numFiles}`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = "<strong>Completado.</strong>";
+        log.innerHTML = "<strong>Extracción Completa.</strong>";
     };
 </script>
 </body>
