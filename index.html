@@ -2,115 +2,104 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Indexer PRO - Descarga Corregida</title>
+    <title>Amnerys - Inyector de Gráficos .IND</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; margin: 20px; text-align: center; }
-        .container { max-width: 800px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; border: 1px solid #333; }
-        h1 { color: #00adb5; }
-        .box { border: 2px dashed #444; padding: 40px; margin: 15px 0; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        .box:hover { border-color: #00adb5; background: #252525; }
-        #status { margin-top: 20px; padding: 15px; border-radius: 5px; background: #000; font-family: monospace; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; color: #0f0; }
-        .download-btn { background: #ff4d4d; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 20px; display: none; width: 100%; }
-        .download-btn:hover { background: #ff2e2e; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 10px; border: 1px solid #00adb5; }
+        input, button { margin: 10px; padding: 10px; border-radius: 5px; border: none; }
+        input[type="number"] { width: 80px; }
+        .btn-main { background: #00adb5; color: white; font-weight: bold; cursor: pointer; width: 100%; }
+        .log { background: #000; color: #0f0; padding: 10px; text-align: left; font-size: 12px; height: 100px; overflow-y: auto; margin-top: 15px; }
+        .setup { border: 1px solid #333; padding: 15px; margin-top: 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Amnerys Graphics Tools</h1>
-    <p>Conversor de .IND a .INI (Estructura Binaria Estándar)</p>
+    <h1>Amnerys IND Modifier</h1>
+    <p>Modifica un Grh específico y descarga el binario listo.</p>
 
-    <div class="box" onclick="document.getElementById('indInput').click()">
-        <strong>HAGA CLIC AQUÍ PARA CARGAR GRAFICOS.IND</strong>
-        <input type="file" id="indInput" hidden accept=".ind">
+    <div class="setup">
+        <label>Archivo .IND original:</label><br>
+        <input type="file" id="fileInput" accept=".ind">
     </div>
 
-    <div id="status">Esperando archivo...</div>
-    
-    <button id="finalDownloadBtn" class="download-btn">DESCARGAR GRAFICOS.INI</button>
+    <div class="setup">
+        <h3>Datos a Inyectar:</h3>
+        Grh a modificar: <input type="number" id="targetGrh" value="32761"><br>
+        Nuevo FileNum: <input type="number" id="newFile" value="5002"><br>
+        Ancho/Alto: <input type="number" id="newW" value="32"> x <input type="number" id="newH" value="32">
+    </div>
+
+    <button id="processBtn" class="btn-main">APLICAR CAMBIO Y DESCARGAR</button>
+
+    <div class="log" id="log">Esperando archivo...</div>
 </div>
 
 <script>
-    const status = document.getElementById('status');
-    const downloadBtn = document.getElementById('finalDownloadBtn');
+    const log = document.getElementById('log');
+    
+    document.getElementById('processBtn').onclick = async () => {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return alert("Sube el archivo .ind primero");
 
-    function log(msg) {
-        status.innerHTML += `> ${msg}<br>`;
-        status.scrollTop = status.scrollHeight;
-    }
-
-    document.getElementById('indInput').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        downloadBtn.style.display = "none";
-        status.innerHTML = "";
-        log(`Leyendo binario: ${file.name}...`);
+        const target = parseInt(document.getElementById('targetGrh').value);
+        const fileNum = parseInt(document.getElementById('newFile').value);
+        const w = parseInt(document.getElementById('newW').value);
+        const h = parseInt(document.getElementById('newH').value);
 
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
-        let offset = 0;
+        let offset = 8; // Saltar cabecera
+        let found = false;
 
-        try {
-            const version = view.getInt32(offset, true); offset += 4;
-            const grhCount = view.getInt32(offset, true); offset += 4;
+        log.innerHTML = `Buscando Grh${target}...<br>`;
 
-            log(`Versión: ${version} | Total: ${grhCount} registros.`);
-
-            let iniData = `[INIT]\nNumGrh=${grhCount}\nVersion=${version}\n\n[Graphics]\n`;
-            let count = 0;
-
-            while (offset < buffer.byteLength) {
-                if (offset + 4 > buffer.byteLength) break;
-                
-                const grhIndex = view.getInt32(offset, true); offset += 4;
-                if (grhIndex <= 0) break;
-
-                const numFrames = view.getInt16(offset, true); offset += 2;
-
-                if (numFrames === 1) {
-                    const fileNum = view.getInt32(offset, true); offset += 4;
-                    const sX = view.getInt16(offset, true); offset += 2;
-                    const sY = view.getInt16(offset, true); offset += 2;
-                    const width = view.getInt16(offset, true); offset += 2;
-                    const height = view.getInt16(offset, true); offset += 2;
-                    iniData += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
-                } else {
-                    let frames = [];
-                    for(let i=0; i<numFrames; i++) {
-                        frames.push(view.getInt32(offset, true));
-                        offset += 4;
-                    }
-                    const speed = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, "");
-                    offset += 4;
-                    iniData += `Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}\n`;
-                }
-                count++;
-                if (count % 5000 === 0) log(`Procesados ${count}...`);
-            }
-
-            log(`Terminado. Generando archivo de descarga...`);
-
-            // MÉTODO DE DESCARGA FORZADA
-            const blob = new Blob([iniData], { type: 'text/plain;charset=utf-8' });
-            const url = window.URL.createObjectURL(blob);
+        while (offset < buffer.byteLength) {
+            if (offset + 4 > buffer.byteLength) break;
             
-            downloadBtn.style.display = "block";
-            downloadBtn.onclick = () => {
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'Graficos.ini';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            };
+            const currentIndex = view.getInt32(offset, true);
+            
+            if (currentIndex === target) {
+                // Encontramos el Grh. Estructura: Index(4) + NumFrames(2)
+                const numFrames = view.getInt16(offset + 4, true);
+                
+                if (numFrames === 1) {
+                    // Es un gráfico simple. Modificamos directamente el Buffer.
+                    // Offset + 4 (NumFrames) + 2 = Comienzo de FileNum
+                    view.setInt32(offset + 6, fileNum, true);
+                    view.setInt16(offset + 10, 0, true); // sX = 0
+                    view.setInt16(offset + 12, 0, true); // sY = 0
+                    view.setInt16(offset + 14, w, true); // Width
+                    view.setInt16(offset + 16, h, true); // Height
+                    
+                    log.innerHTML += `<span style="color:white">¡Grh${target} modificado con éxito!</span><br>`;
+                    found = true;
+                    break;
+                } else {
+                    log.innerHTML += `Error: El Grh${target} es una animación, no se puede modificar como simple.<br>`;
+                    return;
+                }
+            }
+            
+            // Avanzar el puntero según el tipo de Grh para no perderse
+            const frames = view.getInt16(offset + 4, true);
+            if (frames === 1) offset += 18; // Index(4)+Frames(2)+File(4)+X(2)+Y(2)+W(2)+H(2)
+            else offset += 10 + (frames * 4); // Index(4)+Frames(2)+FramesIDs(n*4)+Speed(4)
+            
+            if (currentIndex <= 0) break;
+        }
 
-        } catch (err) {
-            log(`Error crítico: ${err.message}`);
+        if (found) {
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Graficos.ind';
+            a.click();
+            log.innerHTML += `Archivo descargado. Reemplázalo en tu cliente y testea.`;
+        } else {
+            log.innerHTML += `No se encontró el Grh${target}.`;
         }
     };
 </script>
