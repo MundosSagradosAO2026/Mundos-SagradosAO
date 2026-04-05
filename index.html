@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Editor Graficos.ind</title>
+<title>Editor Graficos.ind PRO</title>
 
 <style>
 body{
@@ -15,7 +15,7 @@ body{
 .box{
     border:1px solid #FFD700;
     padding:20px;
-    max-width:700px;
+    max-width:800px;
     margin:auto;
     background:#111;
 }
@@ -35,18 +35,34 @@ pre{
     overflow:auto;
     color:#0f0;
 }
+.progress{
+    width:100%;
+    background:#222;
+    height:20px;
+    margin-top:15px;
+    border:1px solid #FFD700;
+}
+.bar{
+    height:100%;
+    width:0%;
+    background:#FFD700;
+}
 </style>
 </head>
 
 <body>
 
 <div class="box">
-    <h2>📦 Lector Graficos.ind</h2>
+    <h2>📦 Lector Graficos.ind PRO</h2>
 
     <input type="file" id="fileInput"><br>
 
     <button onclick="procesar()">Leer Archivo</button>
     <button onclick="descargar()">Descargar .ini</button>
+
+    <div class="progress">
+        <div class="bar" id="bar"></div>
+    </div>
 
     <p id="info"></p>
 
@@ -64,7 +80,7 @@ function readFloat(view, offset){
     return view.getFloat32(offset, true);
 }
 
-function procesar(){
+async function procesar(){
     const file = document.getElementById("fileInput").files[0];
     if(!file){
         alert("Subí un archivo primero");
@@ -73,66 +89,92 @@ function procesar(){
 
     const reader = new FileReader();
 
-    reader.onload = function(e){
-        const buffer = e.target.result;
-        const view = new DataView(buffer);
+    reader.onload = async function(e){
 
-        let offset = 0;
+        try{
 
-        let version = readLong(view, offset); offset+=4;
-        let grhCount = readLong(view, offset); offset+=4;
+            const buffer = e.target.result;
+            const view = new DataView(buffer);
 
-        let ini = "[INIT]\n";
-        ini += "NumGrh=" + grhCount + "\n";
-        ini += "Version=" + version + "\n\n";
+            let offset = 0;
 
-        let leidos = 0;
+            let version = readLong(view, offset); offset+=4;
+            let grhCount = readLong(view, offset); offset+=4;
 
-        while(true){
-            if(offset >= view.byteLength) break;
+            let ini = "[INIT]\n";
+            ini += "NumGrh=" + grhCount + "\n";
+            ini += "Version=" + version + "\n\n";
 
-            let grhIndex = readLong(view, offset); offset+=4;
+            let leidos = 0;
+            let totalBytes = view.byteLength;
 
-            if(grhIndex === 0) break;
+            while(true){
 
-            let NumFrames = readLong(view, offset); offset+=4;
+                if(offset >= totalBytes) break;
 
-            if(NumFrames === 1){
+                let grhIndex = readLong(view, offset); offset+=4;
 
-                let FileNum = readLong(view, offset); offset+=4;
-                let sX = readLong(view, offset); offset+=4;
-                let sY = readLong(view, offset); offset+=4;
-                let w = readLong(view, offset); offset+=4;
-                let h = readLong(view, offset); offset+=4;
+                if(grhIndex === 0) break;
 
-                ini += `Grh${grhIndex}=${NumFrames}-${FileNum}-${sX}-${sY}-${w}-${h}\n`;
+                let NumFrames = readLong(view, offset); offset+=4;
 
-            }else{
-
-                let frames = [];
-
-                for(let i=0;i<NumFrames;i++){
-                    frames.push(readLong(view, offset));
-                    offset+=4;
+                if(NumFrames <= 0 || NumFrames > 5000){
+                    console.log("Corte por dato inválido en:", grhIndex);
+                    break;
                 }
 
-                let speed = readFloat(view, offset); offset+=4;
-                speed = Math.round(speed);
+                if(NumFrames === 1){
 
-                ini += `Grh${grhIndex}=${NumFrames}-${frames.join("-")}-${speed}\n`;
+                    let FileNum = readLong(view, offset); offset+=4;
+                    let sX = readLong(view, offset); offset+=4;
+                    let sY = readLong(view, offset); offset+=4;
+                    let w = readLong(view, offset); offset+=4;
+                    let h = readLong(view, offset); offset+=4;
+
+                    ini += `Grh${grhIndex}=${NumFrames}-${FileNum}-${sX}-${sY}-${w}-${h}\n`;
+
+                }else{
+
+                    let frames = [];
+
+                    for(let i=0;i<NumFrames;i++){
+                        frames.push(readLong(view, offset));
+                        offset+=4;
+                    }
+
+                    let speed = readFloat(view, offset); offset+=4;
+                    speed = Math.round(speed);
+
+                    ini += `Grh${grhIndex}=${NumFrames}-${frames.join("-")}-${speed}\n`;
+                }
+
+                leidos++;
+
+                // 🔥 Actualiza barra cada 200 gráficos
+                if(leidos % 200 === 0){
+                    let progress = (offset / totalBytes) * 100;
+                    document.getElementById("bar").style.width = progress + "%";
+                    await new Promise(r => setTimeout(r, 1)); // libera UI
+                }
             }
 
-            leidos++;
+            iniTexto = ini;
+
+            document.getElementById("bar").style.width = "100%";
+
+            document.getElementById("info").innerText =
+                "✔ Version: " + version +
+                " | Declarados: " + grhCount +
+                " | Leídos: " + leidos;
+
+            document.getElementById("output").innerText =
+                ini.substring(0, 3000) || "⚠ No se pudo leer contenido";
+
+        }catch(err){
+            console.error(err);
+            document.getElementById("output").innerText =
+                "❌ ERROR: " + err.message;
         }
-
-        iniTexto = ini;
-
-        document.getElementById("info").innerText =
-            "✔ Version: " + version +
-            " | Declarados: " + grhCount +
-            " | Leídos: " + leidos;
-
-        document.getElementById("output").innerText = ini.substring(0,2000);
     };
 
     reader.readAsArrayBuffer(file);
