@@ -2,122 +2,183 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Fix Final</title>
+    <title>Amnerys Suite - Editor & Unpacker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
-        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 20px; }
-        .view-container { display: flex; flex-direction: column; height: 90vh; }
-        .header { background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
+        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; transition: 0.3s; }
+        .logo-title { font-size: 3em; text-shadow: 0 0 15px #00ff00; color: #fff; margin-bottom: 20px; }
+        .grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; width: 80%; max-width: 800px; }
+        .card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
+        .card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; }
+        .view-container { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
+        .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; }
         .unpacker-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; flex: 1; overflow: hidden; }
         .side-panel { background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; gap: 15px; }
         .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
         .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; border-radius: 4px; }
         .img-card img { max-width: 100px; height: auto; image-rendering: pixelated; background: #222; }
         .btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
-        #logUnpack { background:#000; padding:10px; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; color:#0f0; margin-top: 10px; }
+        .btn-back { background: #ff4d4d; }
+        #logUnpack { background:#000; padding:10px; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; color:#0f0; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div class="view-container">
-        <div class="header">
-            <strong>Amnerys Unpacker - Versión de Recuperación</strong>
+    <div id="mainMenu">
+        <div class="logo-title">AMNERYS SUITE</div>
+        <div class="grid-buttons">
+            <div class="card" onclick="showView('editorContainer')">
+                <span>🖼️</span>
+                <h3>Editor Index (.IND)</h3>
+            </div>
+            <div class="card" onclick="showView('unpackerContainer')">
+                <span>📦</span>
+                <h3>Unpacker (.TSAO)</h3>
+            </div>
         </div>
-        
+    </div>
+
+    <div id="editorContainer" class="view-container">
+        <div class="header">
+            <button class="btn btn-back" onclick="showView('mainMenu')">← Volver</button>
+            <input type="file" id="loadInd" style="display:none">
+            <button class="btn" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
+            <div id="statusInd" style="color: #888; font-size: 12px; margin-left: auto;">Listo</div>
+        </div>
+        <textarea id="editor" placeholder="Carga un archivo .ind para editar..."></textarea>
+    </div>
+
+    <div id="unpackerContainer" class="view-container">
+        <div class="header">
+            <button class="btn btn-back" onclick="showView('mainMenu')">← Volver</button>
+            <strong>Desencriptador de Gráficos</strong>
+        </div>
         <div class="unpacker-layout">
             <div class="side-panel">
-                <label>1. Grh_path.tsao:</label>
+                <label>Grh_path.tsao:</label>
                 <input type="file" id="filePaths">
-                <label>2. Grh.tsao:</label>
+                <label>Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">EXTRAER GRÁFICOS</button>
-                <div id="logUnpack">Esperando archivos...</div>
+                <button class="btn" id="btnRunUnpack">EXTRAER IMÁGENES</button>
+                <div id="logUnpack">Esperando...</div>
             </div>
-            
-            <div class="gallery" id="galleryBox">
-                </div>
+            <div class="gallery" id="galleryBox"></div>
         </div>
     </div>
 
 <script>
+    // --- NAVEGACIÓN ---
+    function showView(id) {
+        document.getElementById('mainMenu').classList.add('hidden');
+        document.getElementById('editorContainer').style.display = 'none';
+        document.getElementById('unpackerContainer').style.display = 'none';
+        if(id === 'mainMenu') document.getElementById('mainMenu').classList.remove('hidden');
+        else document.getElementById(id).style.display = 'flex';
+    }
+
+    // --- LÓGICA DEL EDITOR .IND (TUYA) ---
+    const editor = document.getElementById('editor');
+    document.getElementById('loadInd').onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        let offset = 0;
+        let version = view.getInt32(offset, true); offset += 4;
+        const total = view.getInt32(offset, true); offset += 4;
+        let text = `[INIT]\nNumGrh=${total}\nVersion=${version}\n\n[Graphics]\n`;
+        
+        try {
+            while (offset < buffer.byteLength) {
+                if (offset + 4 > buffer.byteLength) break;
+                const index = view.getInt32(offset, true); offset += 4;
+                if (index <= 0) break;
+                const frames = view.getInt16(offset, true); offset += 2;
+                if (frames === 1) {
+                    const f = view.getInt32(offset, true); offset += 4;
+                    const x = view.getInt16(offset, true); offset += 2;
+                    const y = view.getInt16(offset, true); offset += 2;
+                    const w = view.getInt16(offset, true); offset += 2;
+                    const h = view.getInt16(offset, true); offset += 2;
+                    text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
+                } else {
+                    let ids = [];
+                    for(let i=0; i<frames; i++) { ids.push(view.getInt32(offset, true)); offset += 4; }
+                    const spd = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, ""); offset += 4;
+                    text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
+                }
+            }
+            editor.value = text;
+            document.getElementById('statusInd').innerText = `Cargados: ${total}`;
+        } catch(err) { alert("Error leyendo .ind"); }
+    };
+
+    // --- LÓGICA DEL UNPACKER (CORREGIDA) ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const pFile = document.getElementById('filePaths').files[0];
         const dFile = document.getElementById('fileData').files[0];
-        const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
+        const log = document.getElementById('logUnpack');
 
-        if (!pFile || !dFile) return alert("Carga ambos archivos .tsao");
+        if (!pFile || !dFile) return alert("Faltan archivos .tsao");
 
-        log.innerHTML = "Iniciando extracción técnica...<br>";
         gall.innerHTML = "";
+        log.innerHTML = "Analizando...<br>";
         
         const pBuf = await pFile.arrayBuffer();
         const dBuf = await dFile.arrayBuffer();
         const pView = new DataView(pBuf);
         const dBytes = new Uint8Array(dBuf);
         
-        // 1. Detectar número de archivos (bloques de 44 bytes)
-        // Según tus archivos, los primeros 4 bytes son el tamaño total ofuscado.
-        const numFiles = Math.floor((pBuf.byteLength - 4) / 44);
-        log.innerHTML += `Archivos detectados: ${numFiles}<br>`;
-
-        // 2. Clave XOR (Solo si el Zlib falla directamente)
         const key = "quierovalecuatro";
         const datCM = key.split('').map(c => c.charCodeAt(0));
-
-        // Empezamos en el byte 4 (después del header de tamaño)
+        
+        // Empezamos en el byte 4 (saltando el tamaño inicial)
         let offset = 4;
+        const recordSize = 44; 
+        const numFiles = Math.floor((pBuf.byteLength - 4) / recordSize);
+
+        log.innerHTML += `Archivos: ${numFiles}<br>`;
 
         for (let i = 0; i < numFiles; i++) {
-            // Estructura REAL de tus archivos:
-            // [0-31] -> Nombre del archivo (ej: "1.png")
-            // [32-35] -> Posición de inicio en Grh.tsao
-            // [36-39] -> Tamaño comprimido
-            // [40-43] -> Tamaño descomprimido (opcional)
+            let currentOffset = offset + (i * recordSize);
+            if(currentOffset + recordSize > pBuf.byteLength) break;
 
-            let nameBytes = new Uint8Array(pBuf, offset, 32);
+            // Nombre (primeros 32 bytes del bloque)
+            let nameBytes = new Uint8Array(pBuf, currentOffset, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
             
-            const startPos = pView.getUint32(offset + 32, true);
-            const size = pView.getUint32(offset + 36, true);
+            // Punteros (después del nombre)
+            const startPos = pView.getUint32(currentOffset + 32, true);
+            const size = pView.getUint32(currentOffset + 36, true);
 
-            if (size > 0 && size < 5000000 && (startPos + size) <= dBytes.length) {
+            if (size > 0 && startPos + size <= dBytes.length) {
                 try {
                     let chunk = dBytes.slice(startPos, startPos + size);
                     
-                    // Probamos descompresión directa (Zlib)
-                    let unzipped;
-                    try {
-                        unzipped = pako.inflate(chunk);
-                    } catch(e) {
-                        // Si falla, aplicamos el XOR y reintentamos
-                        for (let j = 0; j < chunk.length; j++) {
-                            chunk[j] = chunk[j] ^ datCM[j % datCM.length];
-                        }
-                        unzipped = pako.inflate(chunk);
+                    // Aplicar XOR antes de descompresión
+                    for (let j = 0; j < chunk.length; j++) {
+                        chunk[j] = chunk[j] ^ datCM[j % datCM.length];
                     }
 
+                    const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
 
                     const div = document.createElement('div');
                     div.className = 'img-card';
                     div.innerHTML = `<img src="${url}"><br>${fName}`;
                     gall.appendChild(div);
-
-                } catch (err) {
-                    // console.log("Error en:", fName);
-                }
+                } catch (e) { /* Error de descompresión ignorado */ }
             }
 
-            offset += 44;
-
-            // Refrescar interfaz cada 100 archivos para que no se congele
             if (i % 100 === 0) {
-                log.innerHTML = `Procesando: ${i} / ${numFiles}...`;
+                log.innerHTML = `Extrayendo: ${i} / ${numFiles}`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = "<strong>¡Extracción Completa!</strong>";
+        log.innerHTML = "<strong>Completado.</strong>";
     };
 </script>
 </body>
