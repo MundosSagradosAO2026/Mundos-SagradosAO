@@ -2,140 +2,132 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite v10 - Direct Offset Mode</title>
+    <title>Amnerys Suite v11 - Deep Scan Mode</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
-        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-        #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
-        .logo-title { font-size: 2.2em; text-shadow: 0 0 15px #00ff00; color: #fff; }
-        .grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; max-width: 600px; }
-        .card { background: #1e1e1e; border: 2px solid #333; padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; }
-        .card:hover { border-color: #00adb5; background: #252525; }
-        .view-container { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
-        .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
-        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; }
-        .unpacker-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; flex: 1; overflow: hidden; }
-        .side-panel { background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; gap: 10px; }
-        .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-        .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; }
-        .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; background: #222; }
-        .btn { padding: 8px 15px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
-        #logUnpack { background:#000; padding:10px; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; color:#0f0; }
-        .hidden { display: none !important; }
+        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+        .header { background: #1a1a1a; padding: 20px; border-bottom: 2px solid #333; display: flex; gap: 20px; align-items: center; }
+        .main-content { display: grid; grid-template-columns: 350px 1fr; flex: 1; overflow: hidden; }
+        .side-panel { background: #111; padding: 20px; border-right: 1px solid #333; overflow-y: auto; }
+        .gallery { background: #000; padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .img-card { background: #1a1a1a; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 5px; }
+        .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; margin-bottom: 8px; background: #222; }
+        .btn { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; background: #00adb5; color: white; font-weight: bold; }
+        .btn:hover { background: #008c95; }
+        #log { background: #000; color: #0f0; padding: 10px; font-size: 12px; border: 1px solid #333; margin-top: 10px; height: 200px; overflow-y: auto; white-space: pre-wrap; }
+        input[type="file"] { color: #888; }
     </style>
 </head>
 <body>
 
-    <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE v10</div>
-        <div class="grid-buttons">
-            <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
-            <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
-        </div>
-    </div>
+<div class="header">
+    <div style="font-size: 1.5em; font-weight: bold; color: #fff;">AMNERYS v11 <span style="color: #00adb5;">[DEEP SCAN]</span></div>
+    <input type="file" id="fileInput">
+    <button class="btn" id="btnProcess">INICIAR EXTRACCIÓN</button>
+</div>
 
-    <div id="editorContainer" class="view-container">
-        <div class="header">
-            <button class="btn" onclick="showView('mainMenu')">Volver</button>
-            <input type="file" id="loadInd" style="display:none">
-            <button class="btn" onclick="document.getElementById('loadInd').click()">Abrir .IND</button>
-            <div id="statusInd" style="margin-left:auto">Listo</div>
-        </div>
-        <textarea id="editor" spellcheck="false"></textarea>
+<div class="main-content">
+    <div class="side-panel">
+        <h4 style="margin-top:0">Estado del Escaneo</h4>
+        <div id="log">Esperando archivo...</div>
     </div>
-
-    <div id="unpackerContainer" class="view-container">
-        <div class="header">
-            <button class="btn" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor por Offset Directo</strong>
+    <div class="gallery" id="gallery">
         </div>
-        <div class="unpacker-layout">
-            <div class="side-panel">
-                <label>Archivo Grh.tsao:</label>
-                <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">EXTRAER GRÁFICOS</button>
-                <div id="logUnpack">Listo para procesar...</div>
-            </div>
-            <div class="gallery" id="galleryBox"></div>
-        </div>
-    </div>
+</div>
 
 <script>
-    function showView(id) {
-        document.getElementById('mainMenu').classList.add('hidden');
-        document.getElementById('editorContainer').style.display = 'none';
-        document.getElementById('unpackerContainer').style.display = 'none';
-        if(id === 'mainMenu') document.getElementById('mainMenu').classList.remove('hidden');
-        else document.getElementById(id).style.display = 'flex';
+    const logElement = document.getElementById('log');
+    function writeLog(msg) {
+        logElement.innerHTML += msg + "\n";
+        logElement.scrollTop = logElement.scrollHeight;
     }
 
-    // --- LÓGICA DE EXTRACCIÓN v10 ---
-    document.getElementById('btnRunUnpack').onclick = async () => {
-        const dFile = document.getElementById('fileData').files[0];
-        if (!dFile) return alert("Carga el archivo .tsao");
-        
-        const log = document.getElementById('logUnpack');
-        const gall = document.getElementById('galleryBox');
-        gall.innerHTML = "";
-        
-        const dBuf = await dFile.arrayBuffer();
-        const dView = new DataView(dBuf);
-        const dBytes = new Uint8Array(dBuf);
+    document.getElementById('btnProcess').onclick = async () => {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return alert("Por favor, selecciona Grh.tsao");
 
-        // Según el hex, el número de archivos está en el byte 2
-        const numFiles = dView.getUint16(2, true);
-        log.innerHTML = `Archivos detectados: ${numFiles}<br>`;
+        const gallery = document.getElementById('gallery');
+        gallery.innerHTML = "";
+        logElement.innerHTML = "Iniciando lectura de binario...\n";
 
-        let offset = 6;
-        const recordSize = 40;
-        let count = 0;
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        const bytes = new Uint8Array(buffer);
+
+        // 1. Leer cabecera (NumFiles)
+        const numFiles = view.getUint16(2, true);
+        writeLog(`Archivos declarados en índice: ${numFiles}`);
+
+        let indexOffset = 6;
+        const entrySize = 40;
+        let successCount = 0;
 
         for (let i = 0; i < numFiles; i++) {
-            if (offset + recordSize > dBuf.byteLength) break;
+            if (indexOffset + entrySize > buffer.byteLength) break;
 
-            // LEER ESTRUCTURA SEGÚN HEXADECIMAL DE 40 BYTES
-            const absoluteOffset = dView.getUint32(offset + 4, true); // Bytes 4-7
-            const compressedSize = dView.getUint32(offset + 8, true); // Bytes 8-11
-            
-            const nameBytes = new Uint8Array(dBuf, offset + 12, 28); // Bytes 12-39
-            let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
+            // Extraer metadatos del índice
+            const dataPos = view.getUint32(indexOffset + 4, true); 
+            const dataLen = view.getUint32(indexOffset + 8, true);
+            const nameArr = new Uint8Array(buffer, indexOffset + 12, 28);
+            let fileName = new TextDecoder().decode(nameArr).replace(/\0/g, '').trim();
 
-            if (compressedSize > 0 && absoluteOffset + compressedSize <= dBytes.length) {
-                try {
-                    const chunk = dBytes.slice(absoluteOffset, absoluteOffset + compressedSize);
-                    
-                    // Si la entropía es 8, los datos están comprimidos con Zlib
-                    const decompressed = pako.inflate(chunk);
-                    const blob = new Blob([decompressed], { type: 'image/png' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const div = document.createElement('div');
-                    div.className = 'img-card';
-                    div.innerHTML = `<img src="${url}"><br>${fName}`;
-                    gall.appendChild(div);
-                    count++;
-                } catch (e) {
-                    // Si pako falla, intentamos ver si es un PNG plano
-                    if (dBytes[absoluteOffset] === 0x89 && dBytes[absoluteOffset+1] === 0x50) {
-                        const blob = new Blob([dBytes.slice(absoluteOffset, absoluteOffset + compressedSize)], { type: 'image/png' });
-                        const url = URL.createObjectURL(blob);
-                        const div = document.createElement('div');
-                        div.className = 'img-card';
-                        div.innerHTML = `<img src="${url}"><br>${fName}`;
-                        gall.appendChild(div);
-                        count++;
+            if (dataLen > 0 && dataPos < buffer.byteLength) {
+                let extracted = false;
+                let chunk = bytes.slice(dataPos, dataPos + dataLen);
+
+                // INTENTO 1: ¿Es un PNG directo? (Firma 89 50 4E 47)
+                if (chunk[0] === 0x89 && chunk[1] === 0x50 && chunk[2] === 0x4E && chunk[3] === 0x47) {
+                    displayImage(chunk, fileName);
+                    extracted = true;
+                } 
+                // INTENTO 2: ¿Es un flujo Zlib comprimido?
+                else {
+                    try {
+                        const decompressed = pako.inflate(chunk);
+                        displayImage(decompressed, fileName);
+                        extracted = true;
+                    } catch (e) {
+                        // INTENTO 3: Búsqueda agresiva (Deep Scan)
+                        // A veces el offset está movido por unos pocos bytes (cabeceras de bloque)
+                        for (let scan = 1; scan < 16; scan++) {
+                            try {
+                                const subChunk = bytes.slice(dataPos + scan, dataPos + dataLen);
+                                const decompressed = pako.inflate(subChunk);
+                                displayImage(decompressed, fileName);
+                                extracted = true;
+                                break;
+                            } catch (err) {}
+                        }
                     }
                 }
+
+                if (extracted) successCount++;
             }
 
-            offset += recordSize;
-            if (i % 200 === 0) {
-                log.innerHTML = `Extrayendo: ${i}/${numFiles}...`;
+            indexOffset += entrySize;
+
+            if (i % 500 === 0) {
+                writeLog(`Procesando: ${i}...`);
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = `<strong>¡Éxito! ${count} imágenes recuperadas.</strong>`;
+
+        writeLog(`--- PROCESO FINALIZADO ---`);
+        writeLog(`Imágenes recuperadas: ${successCount}`);
+        if (successCount === 0) {
+            writeLog("ERROR: No se detectaron firmas válidas. Es posible que el desplazamiento de datos sea global.");
+        }
     };
+
+    function displayImage(data, name) {
+        const blob = new Blob([data], { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        const div = document.createElement('div');
+        div.className = 'img-card';
+        div.innerHTML = `<img src="${url}"><div style="font-size:10px; color:#aaa">${name}</div>`;
+        document.getElementById('gallery').appendChild(div);
+    }
 </script>
+
 </body>
 </html>
