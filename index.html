@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSao PRO</title>
+<title>TSao Extractor + Analyzer PRO</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
@@ -14,15 +14,10 @@ body{
     text-align:center;
 }
 
-.container{
-    max-width:900px;
-    margin:auto;
-}
-
 #log{
     background:#000;
     color:#00ff00;
-    height:150px;
+    height:180px;
     overflow:auto;
     padding:10px;
     margin-top:10px;
@@ -34,33 +29,41 @@ body{
     display:grid;
     grid-template-columns: repeat(auto-fill, 100px);
     gap:10px;
-    justify-content:center;
 }
 
 img{
     width:100px;
     border:1px solid #333;
 }
+
+#dump{
+    background:#111;
+    color:#0ff;
+    height:150px;
+    overflow:auto;
+    margin-top:10px;
+    padding:10px;
+    font-size:11px;
+}
 </style>
 </head>
 
 <body>
 
-<div class="container">
-<h2>Extractor Grh.tsao</h2>
+<h2>TSao Extractor + Analyzer</h2>
 
 <input type="file" id="fileInput">
 <br><br>
 <button onclick="start()">EXTRAER</button>
 
 <div id="log"></div>
+<div id="dump"></div>
 <div id="images"></div>
-
-</div>
 
 <script>
 
 const logDiv = document.getElementById("log");
+const dumpDiv = document.getElementById("dump");
 const imgDiv = document.getElementById("images");
 
 function log(t){
@@ -68,7 +71,15 @@ function log(t){
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// clave VB6
+function hexDump(arr, max=64){
+    let s="";
+    for(let i=0;i<Math.min(arr.length,max);i++){
+        s += arr[i].toString(16).padStart(2,"0")+" ";
+    }
+    return s;
+}
+
+// clave
 const keyStr = "quierovalecuatro";
 const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
 
@@ -81,10 +92,35 @@ function readString(bytes, offset, len){
     return s.trim();
 }
 
+function xorFull(data){
+    let out = new Uint8Array(data.length);
+    for(let i=0;i<data.length;i++){
+        out[i] = data[i] ^ key[i % key.length];
+    }
+    return out;
+}
+
+function xorOffset(data, offset){
+    let out = new Uint8Array(data.length);
+    for(let i=0;i<data.length;i++){
+        out[i] = data[i] ^ key[(i+offset) % key.length];
+    }
+    return out;
+}
+
+function tryInflate(data){
+    try{
+        return pako.inflate(data);
+    }catch{
+        return null;
+    }
+}
+
 async function start(){
 
     imgDiv.innerHTML="";
     logDiv.innerHTML="";
+    dumpDiv.innerHTML="";
 
     const file = document.getElementById("fileInput").files[0];
     if(!file) return alert("Seleccioná archivo");
@@ -93,13 +129,10 @@ async function start(){
 
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-
     const view = new DataView(buffer);
 
-    // HEADER
     let numFiles = view.getUint16(4, true);
 
-    // fallback offset VB6
     if(numFiles<=0 || numFiles>50000){
         numFiles = view.getUint16(12, true);
         log("Header corregido");
@@ -107,9 +140,7 @@ async function start(){
 
     log("Archivos: " + numFiles);
 
-    let offset = 6;
-
-    if(numFiles>50000) offset = 14;
+    let offset = (numFiles>50000)?14:6;
 
     let files = [];
 
@@ -121,57 +152,75 @@ async function start(){
         let usize = view.getUint32(offset+40, true);
 
         files.push({start,size,name,usize});
-
         offset += 44;
     }
 
     log("Index leído");
 
-    let ok = 0;
-    let fail = 0;
+    // 🔍 ANALIZAMOS PRIMER ARCHIVO
+    let test = files[0];
+    let raw = bytes.slice(test.start, test.start + test.size);
 
-    for(let i=0;i<files.length;i++){
+    log("Primer archivo: " + test.name);
+    dumpDiv.innerHTML += "RAW:\n" + hexDump(raw) + "\n\n";
 
-        let f = files[i];
+    // TEST 1
+    let x1 = xorFull(raw);
+    dumpDiv.innerHTML += "XOR FULL:\n" + hexDump(x1) + "\n\n";
+
+    // TEST 2
+    let x2 = xorOffset(raw, test.start);
+    dumpDiv.innerHTML += "XOR OFFSET:\n" + hexDump(x2) + "\n\n";
+
+    // TRY INFLATE
+    let t1 = tryInflate(x1);
+    let t2 = tryInflate(x2);
+    let t3 = tryInflate(raw);
+
+    log("Test inflate RAW: " + (t3 ? "OK" : "FAIL"));
+    log("Test inflate XOR FULL: " + (t1 ? "OK" : "FAIL"));
+    log("Test inflate XOR OFFSET: " + (t2 ? "OK" : "FAIL"));
+
+    let mode = null;
+
+    if(t1) mode = "xorFull";
+    else if(t2) mode = "xorOffset";
+    else if(t3) mode = "raw";
+
+    if(!mode){
+        log("❌ No se detectó método válido");
+        return;
+    }
+
+    log("✔ Método detectado: " + mode);
+
+    let ok=0, fail=0;
+
+    for(let f of files){
 
         try{
 
             let data = bytes.slice(f.start, f.start + f.size);
 
-            // XOR CORRECTO (SOLO PRIMEROS BYTES)
-            for(let j=0;j<key.length && j<data.length;j++){
-                data[j] ^= key[j];
-            }
+            if(mode==="xorFull") data = xorFull(data);
+            if(mode==="xorOffset") data = xorOffset(data, f.start);
 
-            let decompressed = pako.inflate(data);
+            let out = pako.inflate(data);
 
-            let blob = new Blob([decompressed], {type:"image/png"});
-            let url = URL.createObjectURL(blob);
-
+            let blob = new Blob([out], {type:"image/png"});
             let img = document.createElement("img");
-            img.src = url;
-            img.title = f.name;
+            img.src = URL.createObjectURL(blob);
 
             imgDiv.appendChild(img);
-
             ok++;
 
         }catch(e){
             fail++;
-            if(fail < 30){
-                log("Error en " + f.name);
-            }
-        }
-
-        if(i % 50 === 0){
-            await new Promise(r=>setTimeout(r,1));
         }
     }
 
     log("OK: " + ok);
-    log("Errores: " + fail);
-    log("FIN");
-
+    log("FAIL: " + fail);
 }
 
 </script>
