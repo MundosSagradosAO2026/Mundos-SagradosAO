@@ -2,48 +2,23 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSao FINAL PRO</title>
+<title>Extractor TSao FINAL EXTREMO</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
 <style>
-body{
-    background:#0b0b0b;
-    color:#FFD700;
-    font-family: monospace;
-    text-align:center;
-}
-
-#log{
-    background:#000;
-    color:#00ff00;
-    height:180px;
-    overflow:auto;
-    padding:10px;
-    margin-top:10px;
-    font-size:12px;
-}
-
-#images{
-    margin-top:20px;
-    display:grid;
-    grid-template-columns: repeat(auto-fill, 100px);
-    gap:10px;
-}
-
-img{
-    width:100px;
-    border:1px solid #333;
-}
+body{background:#0b0b0b;color:#FFD700;font-family:monospace;text-align:center;}
+#log{background:#000;color:#0f0;height:180px;overflow:auto;padding:10px;margin-top:10px;font-size:12px;}
+#images{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,100px);gap:10px;}
+img{width:100px;border:1px solid #333;}
 </style>
 </head>
 
 <body>
 
-<h2>Extractor Grh.tsao FINAL</h2>
+<h2>Extractor TSao EXTREMO</h2>
 
-<input type="file" id="fileInput">
-<br><br>
+<input type="file" id="fileInput"><br><br>
 <button onclick="start()">EXTRAER</button>
 
 <div id="log"></div>
@@ -59,10 +34,6 @@ function log(t){
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// clave (por si hay XOR)
-const keyStr = "quierovalecuatro";
-const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
-
 function readString(bytes, offset, len){
     let s="";
     for(let i=0;i<len;i++){
@@ -72,69 +43,36 @@ function readString(bytes, offset, len){
     return s.trim();
 }
 
-function xorFull(data){
-    let out = new Uint8Array(data.length);
-    for(let i=0;i<data.length;i++){
-        out[i] = data[i] ^ key[i % key.length];
-    }
-    return out;
-}
+// 🔍 buscar dentro de todo el bloque
+function findCandidates(data){
 
-function xorOffset(data, offset){
-    let out = new Uint8Array(data.length);
-    for(let i=0;i<data.length;i++){
-        out[i] = data[i] ^ key[(i+offset) % key.length];
-    }
-    return out;
-}
+    let offsets = [];
 
-// 🔍 busca inicio real dentro del bloque
-function findRealStart(data){
-
-    for(let i=0;i<32;i++){
+    for(let i=0;i<data.length-4;i++){
 
         // PNG
-        if(data[i] === 0x89 && data[i+1] === 0x50 && data[i+2] === 0x4E){
-            return i;
+        if(data[i]===0x89 && data[i+1]===0x50 && data[i+2]===0x4E){
+            offsets.push(i);
         }
 
         // ZLIB
-        if(data[i] === 0x78 && (
-            data[i+1] === 0x9C ||
-            data[i+1] === 0xDA ||
-            data[i+1] === 0x01
-        )){
-            return i;
+        if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)){
+            offsets.push(i);
         }
 
-        // RAW DEFLATE (heurística)
-        if(
-            data[i] === 0x63 ||
-            data[i] === 0xED ||
-            data[i] === 0x0B ||
-            data[i] === 0x73
-        ){
-            return i;
+        // posibles deflate
+        if(data[i]===0x63 || data[i]===0xED){
+            offsets.push(i);
         }
     }
 
-    return 0;
+    return offsets;
 }
 
-// 💥 prueba todos los métodos
-function tryAll(data, offset){
-
-    // PNG directo
-    if(data[0] === 0x89 && data[1] === 0x50){
-        return data;
-    }
+function tryInflate(data){
 
     try{ return pako.inflateRaw(data); }catch{}
     try{ return pako.inflate(data); }catch{}
-    try{ return pako.inflateRaw(xorFull(data)); }catch{}
-    try{ return pako.inflate(xorFull(data)); }catch{}
-    try{ return pako.inflateRaw(xorOffset(data, offset)); }catch{}
-    try{ return pako.inflate(xorOffset(data, offset)); }catch{}
 
     return null;
 }
@@ -154,33 +92,26 @@ async function start(){
     const view = new DataView(buffer);
 
     let numFiles = view.getUint16(4, true);
-
     if(numFiles<=0 || numFiles>50000){
         numFiles = view.getUint16(12, true);
-        log("Header corregido");
     }
 
     log("Archivos: " + numFiles);
 
     let offset = (numFiles>50000)?14:6;
-
     let files = [];
 
     for(let i=0;i<numFiles;i++){
-
         let start = view.getUint32(offset, true);
         let size = view.getUint32(offset+4, true);
         let name = readString(bytes, offset+8, 32);
-        let usize = view.getUint32(offset+40, true);
-
-        files.push({start,size,name,usize});
+        files.push({start,size,name});
         offset += 44;
     }
 
     log("Index leído");
 
-    let ok = 0;
-    let fail = 0;
+    let ok=0, fail=0;
 
     for(let i=0;i<files.length;i++){
 
@@ -188,15 +119,26 @@ async function start(){
 
         try{
 
-            // leer bloque
             let raw = bytes.slice(f.start, f.start + f.size);
 
-            // encontrar inicio real
-            let shift = findRealStart(raw);
-            let data = raw.slice(shift);
+            // 🔥 buscar posibles offsets reales
+            let candidates = findCandidates(raw);
 
-            // intentar decodificar
-            let out = tryAll(data, f.start);
+            let out = null;
+
+            for(let c of candidates){
+
+                let slice = raw.slice(c);
+
+                // PNG directo
+                if(slice[0]===0x89 && slice[1]===0x50){
+                    out = slice;
+                    break;
+                }
+
+                out = tryInflate(slice);
+                if(out) break;
+            }
 
             if(!out) throw "fail";
 
@@ -210,14 +152,14 @@ async function start(){
 
             ok++;
 
-        }catch(e){
+        }catch{
             fail++;
             if(fail < 20){
                 log("Error en " + f.name);
             }
         }
 
-        if(i % 50 === 0){
+        if(i % 20 === 0){
             await new Promise(r=>setTimeout(r,1));
         }
     }
