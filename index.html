@@ -2,106 +2,188 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys - Inyector de Gráficos .IND</title>
+    <title>Amnerys Graphics Master Editor</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; text-align: center; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 10px; border: 1px solid #00adb5; }
-        input, button { margin: 10px; padding: 10px; border-radius: 5px; border: none; }
-        input[type="number"] { width: 80px; }
-        .btn-main { background: #00adb5; color: white; font-weight: bold; cursor: pointer; width: 100%; }
-        .log { background: #000; color: #0f0; padding: 10px; text-align: left; font-size: 12px; height: 100px; overflow-y: auto; margin-top: 15px; }
-        .setup { border: 1px solid #333; padding: 15px; margin-top: 15px; border-radius: 5px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #2d2d2d; padding: 15px; border-bottom: 2px solid #00adb5; display: flex; gap: 10px; align-items: center; }
+        .controls { padding: 10px; background: #333; display: flex; gap: 10px; flex-wrap: wrap; }
+        .table-container { flex: 1; overflow: auto; background: #000; }
+        table { border-collapse: collapse; width: 100%; font-size: 13px; }
+        th { position: sticky; top: 0; background: #444; padding: 8px; border: 1px solid #555; }
+        td { border: 1px solid #333; padding: 2px; text-align: center; }
+        input { background: transparent; color: #0f0; border: none; width: 100%; text-align: center; outline: none; }
+        input:focus { background: #222; border-bottom: 1px solid #00adb5; }
+        .btn { background: #00adb5; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: #008f95; }
+        .btn-save { background: #28a745; }
+        #status { font-size: 12px; color: #00adb5; margin-left: auto; }
+        .row-anim { background: #2a3d4a; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Amnerys IND Modifier</h1>
-    <p>Modifica un Grh específico y descarga el binario listo.</p>
+<header>
+    <strong>Amnerys Indexer PRO</strong>
+    <input type="file" id="loadInd" accept=".ind">
+    <button class="btn btn-save" id="exportInd">Descargar .IND (Binario)</button>
+    <button class="btn" id="exportIni">Descargar .INI (Texto)</button>
+    <div id="status">Carga un archivo .ind para empezar</div>
+</header>
 
-    <div class="setup">
-        <label>Archivo .IND original:</label><br>
-        <input type="file" id="fileInput" accept=".ind">
-    </div>
+<div class="controls">
+    <span>Ir a Grh:</span>
+    <input type="number" id="searchGrh" style="width: 100px; background: #444; border-radius: 4px;" placeholder="Ej: 32761">
+    <button class="btn" onclick="goToGrh()">Buscar</button>
+</div>
 
-    <div class="setup">
-        <h3>Datos a Inyectar:</h3>
-        Grh a modificar: <input type="number" id="targetGrh" value="32761"><br>
-        Nuevo FileNum: <input type="number" id="newFile" value="5002"><br>
-        Ancho/Alto: <input type="number" id="newW" value="32"> x <input type="number" id="newH" value="32">
-    </div>
-
-    <button id="processBtn" class="btn-main">APLICAR CAMBIO Y DESCARGAR</button>
-
-    <div class="log" id="log">Esperando archivo...</div>
+<div class="table-container">
+    <table id="graphicTable">
+        <thead>
+            <tr>
+                <th>Grh Index</th>
+                <th>Frames</th>
+                <th>FileNum / IDs</th>
+                <th>X</th>
+                <th>Y</th>
+                <th>Width</th>
+                <th>Height</th>
+                <th>Speed</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
 </div>
 
 <script>
-    const log = document.getElementById('log');
-    
-    document.getElementById('processBtn').onclick = async () => {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return alert("Sube el archivo .ind primero");
+    let grhData = [];
+    let fileVersion = 447;
 
-        const target = parseInt(document.getElementById('targetGrh').value);
-        const fileNum = parseInt(document.getElementById('newFile').value);
-        const w = parseInt(document.getElementById('newW').value);
-        const h = parseInt(document.getElementById('newH').value);
+    document.getElementById('loadInd').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
-        let offset = 8; // Saltar cabecera
-        let found = false;
+        let offset = 0;
 
-        log.innerHTML = `Buscando Grh${target}...<br>`;
+        fileVersion = view.getInt32(offset, true); offset += 4;
+        const totalGrhs = view.getInt32(offset, true); offset += 4;
+        
+        grhData = [];
+        document.getElementById('tableBody').innerHTML = "Procesando...";
 
-        while (offset < buffer.byteLength) {
-            if (offset + 4 > buffer.byteLength) break;
-            
-            const currentIndex = view.getInt32(offset, true);
-            
-            if (currentIndex === target) {
-                // Encontramos el Grh. Estructura: Index(4) + NumFrames(2)
-                const numFrames = view.getInt16(offset + 4, true);
-                
-                if (numFrames === 1) {
-                    // Es un gráfico simple. Modificamos directamente el Buffer.
-                    // Offset + 4 (NumFrames) + 2 = Comienzo de FileNum
-                    view.setInt32(offset + 6, fileNum, true);
-                    view.setInt16(offset + 10, 0, true); // sX = 0
-                    view.setInt16(offset + 12, 0, true); // sY = 0
-                    view.setInt16(offset + 14, w, true); // Width
-                    view.setInt16(offset + 16, h, true); // Height
-                    
-                    log.innerHTML += `<span style="color:white">¡Grh${target} modificado con éxito!</span><br>`;
-                    found = true;
-                    break;
+        try {
+            while (offset < buffer.byteLength) {
+                if (offset + 4 > buffer.byteLength) break;
+                const index = view.getInt32(offset, true); offset += 4;
+                if (index <= 0) break;
+
+                const frames = view.getInt16(offset, true); offset += 2;
+                let entry = { index, frames };
+
+                if (frames === 1) {
+                    entry.fileNum = view.getInt32(offset, true); offset += 4;
+                    entry.sX = view.getInt16(offset, true); offset += 2;
+                    entry.sY = view.getInt16(offset, true); offset += 2;
+                    entry.width = view.getInt16(offset, true); offset += 2;
+                    entry.height = view.getInt16(offset, true); offset += 2;
                 } else {
-                    log.innerHTML += `Error: El Grh${target} es una animación, no se puede modificar como simple.<br>`;
-                    return;
+                    entry.frameIDs = [];
+                    for(let i=0; i<frames; i++) {
+                        entry.frameIDs.push(view.getInt32(offset, true));
+                        offset += 4;
+                    }
+                    entry.speed = view.getFloat32(offset, true); offset += 4;
                 }
+                grhData.push(entry);
             }
-            
-            // Avanzar el puntero según el tipo de Grh para no perderse
-            const frames = view.getInt16(offset + 4, true);
-            if (frames === 1) offset += 18; // Index(4)+Frames(2)+File(4)+X(2)+Y(2)+W(2)+H(2)
-            else offset += 10 + (frames * 4); // Index(4)+Frames(2)+FramesIDs(n*4)+Speed(4)
-            
-            if (currentIndex <= 0) break;
-        }
-
-        if (found) {
-            const blob = new Blob([buffer], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'Graficos.ind';
-            a.click();
-            log.innerHTML += `Archivo descargado. Reemplázalo en tu cliente y testea.`;
-        } else {
-            log.innerHTML += `No se encontró el Grh${target}.`;
+            renderTable();
+            document.getElementById('status').innerText = `Cargados ${grhData.length} Grhs (Versión ${fileVersion})`;
+        } catch(err) {
+            alert("Error en formato binario. El desfase impidió la lectura.");
         }
     };
+
+    function renderTable() {
+        const body = document.getElementById('tableBody');
+        body.innerHTML = "";
+        grhData.forEach((g, i) => {
+            const tr = document.createElement('tr');
+            if(g.frames > 1) tr.className = "row-anim";
+            
+            tr.innerHTML = `
+                <td>${g.index}</td>
+                <td><input type="number" value="${g.frames}" onchange="update(${i}, 'frames', this.value)"></td>
+                <td><input type="text" value="${g.frames === 1 ? g.fileNum : g.frameIDs.join('-')}" onchange="update(${i}, 'fileData', this.value)"></td>
+                <td><input type="number" value="${g.sX || 0}" ${g.frames > 1 ? 'disabled' : ''} onchange="update(${i}, 'sX', this.value)"></td>
+                <td><input type="number" value="${g.sY || 0}" ${g.frames > 1 ? 'disabled' : ''} onchange="update(${i}, 'sY', this.value)"></td>
+                <td><input type="number" value="${g.width || 0}" ${g.frames > 1 ? 'disabled' : ''} onchange="update(${i}, 'width', this.value)"></td>
+                <td><input type="number" value="${g.height || 0}" ${g.frames > 1 ? 'disabled' : ''} onchange="update(${i}, 'height', this.value)"></td>
+                <td><input type="number" step="0.01" value="${g.speed || 0}" ${g.frames === 1 ? 'disabled' : ''} onchange="update(${i}, 'speed', this.value)"></td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    function update(i, field, value) {
+        if (field === 'fileData') {
+            if (grhData[i].frames === 1) grhData[i].fileNum = parseInt(value);
+            else grhData[i].frameIDs = value.split('-').map(Number);
+        } else {
+            grhData[i][field] = (field === 'speed') ? parseFloat(value) : parseInt(value);
+        }
+    }
+
+    function goToGrh() {
+        const val = document.getElementById('searchGrh').value;
+        const rows = document.querySelectorAll('tr');
+        for(let row of rows) {
+            if(row.cells[0] && row.cells[0].innerText === val) {
+                row.scrollIntoView();
+                row.style.background = "#552200";
+                break;
+            }
+        }
+    }
+
+    // EXPORTAR BINARIO (.IND)
+    document.getElementById('exportInd').onclick = () => {
+        const buffer = new ArrayBuffer(grhData.length * 80); // Espacio de sobra
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        view.setInt32(offset, fileVersion, true); offset += 4;
+        view.setInt32(offset, grhData.length, true); offset += 4;
+
+        grhData.forEach(g => {
+            view.setInt32(offset, g.index, true); offset += 4;
+            view.setInt16(offset, g.frames, true); offset += 2;
+
+            if (g.frames === 1) {
+                view.setInt32(offset, g.fileNum, true); offset += 4;
+                view.setInt16(offset, g.sX, true); offset += 2;
+                view.setInt16(offset, g.sY, true); offset += 2;
+                view.setInt16(offset, g.width, true); offset += 2;
+                view.setInt16(offset, g.height, true); offset += 2;
+            } else {
+                g.frameIDs.forEach(id => {
+                    view.setInt32(offset, id, true); offset += 4;
+                });
+                view.setFloat32(offset, g.speed, true); offset += 4;
+            }
+        });
+
+        view.setInt32(offset, 0, true); offset += 4;
+        const blob = new Blob([buffer.slice(0, offset)], { type: 'application/octet-stream' });
+        saveAs(blob, "Graficos.ind");
+    };
+
+    function saveAs(blob, name) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+    }
 </script>
 </body>
 </html>
