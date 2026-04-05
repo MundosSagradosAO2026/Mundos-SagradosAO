@@ -1,132 +1,191 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Amnerys Suite v11 - Deep Scan Mode</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    <style>
-        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-        .header { background: #1a1a1a; padding: 20px; border-bottom: 2px solid #333; display: flex; gap: 20px; align-items: center; }
-        .main-content { display: grid; grid-template-columns: 350px 1fr; flex: 1; overflow: hidden; }
-        .side-panel { background: #111; padding: 20px; border-right: 1px solid #333; overflow-y: auto; }
-        .gallery { background: #000; padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
-        .img-card { background: #1a1a1a; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 5px; }
-        .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; margin-bottom: 8px; background: #222; }
-        .btn { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; background: #00adb5; color: white; font-weight: bold; }
-        .btn:hover { background: #008c95; }
-        #log { background: #000; color: #0f0; padding: 10px; font-size: 12px; border: 1px solid #333; margin-top: 10px; height: 200px; overflow-y: auto; white-space: pre-wrap; }
-        input[type="file"] { color: #888; }
-    </style>
+<meta charset="UTF-8">
+<title>Extractor TSAO Viewer</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+body {
+    background: #0b0b0b;
+    color: #00ffcc;
+    font-family: monospace;
+    padding: 20px;
+}
+
+button {
+    background: #00ffcc;
+    border: none;
+    padding: 10px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+#log {
+    background: #000;
+    padding: 10px;
+    height: 150px;
+    overflow: auto;
+    border: 1px solid #333;
+    margin-top: 10px;
+}
+
+#imagenes {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.imgBox {
+    background: #111;
+    padding: 5px;
+    border: 1px solid #333;
+    text-align: center;
+}
+
+.imgBox img {
+    max-width: 120px;
+    display: block;
+}
+</style>
 </head>
+
 <body>
 
-<div class="header">
-    <div style="font-size: 1.5em; font-weight: bold; color: #fff;">AMNERYS v11 <span style="color: #00adb5;">[DEEP SCAN]</span></div>
-    <input type="file" id="fileInput">
-    <button class="btn" id="btnProcess">INICIAR EXTRACCIÓN</button>
-</div>
+<h2>Extractor PNG de .tsao (con visor)</h2>
 
-<div class="main-content">
-    <div class="side-panel">
-        <h4 style="margin-top:0">Estado del Escaneo</h4>
-        <div id="log">Esperando archivo...</div>
-    </div>
-    <div class="gallery" id="gallery">
-        </div>
-</div>
+<input type="file" id="fileInput">
+<button id="startBtn">EXTRAER Y MOSTRAR</button>
+<button id="downloadBtn" style="display:none;">DESCARGAR ZIP</button>
+
+<div id="log"></div>
+<div id="imagenes"></div>
 
 <script>
-    const logElement = document.getElementById('log');
-    function writeLog(msg) {
-        logElement.innerHTML += msg + "\n";
-        logElement.scrollTop = logElement.scrollHeight;
+const logDiv = document.getElementById("log");
+const imgDiv = document.getElementById("imagenes");
+const startBtn = document.getElementById("startBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+
+let zip = new JSZip();
+
+function log(text){
+    let p = document.createElement("div");
+    p.textContent = "> " + text;
+    logDiv.appendChild(p);
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+startBtn.onclick = async () => {
+
+    const file = document.getElementById("fileInput").files[0];
+    if(!file){
+        alert("Seleccioná un .tsao");
+        return;
     }
 
-    document.getElementById('btnProcess').onclick = async () => {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return alert("Por favor, selecciona Grh.tsao");
+    logDiv.innerHTML = "";
+    imgDiv.innerHTML = "";
+    zip = new JSZip();
+    startBtn.disabled = true;
+    downloadBtn.style.display = "none";
 
-        const gallery = document.getElementById('gallery');
-        gallery.innerHTML = "";
-        logElement.innerHTML = "Iniciando lectura de binario...\n";
+    log("Cargando archivo...");
 
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        const bytes = new Uint8Array(buffer);
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
 
-        // 1. Leer cabecera (NumFiles)
-        const numFiles = view.getUint16(2, true);
-        writeLog(`Archivos declarados en índice: ${numFiles}`);
+    log("Tamaño: " + (bytes.length / 1024 / 1024).toFixed(2) + " MB");
 
-        let indexOffset = 6;
-        const entrySize = 40;
-        let successCount = 0;
+    const startSig = [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A];
+    const endSig   = [0x49,0x45,0x4E,0x44,0xAE,0x42,0x60,0x82];
 
-        for (let i = 0; i < numFiles; i++) {
-            if (indexOffset + entrySize > buffer.byteLength) break;
+    let found = 0;
 
-            // Extraer metadatos del índice
-            const dataPos = view.getUint32(indexOffset + 4, true); 
-            const dataLen = view.getUint32(indexOffset + 8, true);
-            const nameArr = new Uint8Array(buffer, indexOffset + 12, 28);
-            let fileName = new TextDecoder().decode(nameArr).replace(/\0/g, '').trim();
+    log("Buscando PNG...");
 
-            if (dataLen > 0 && dataPos < buffer.byteLength) {
-                let extracted = false;
-                let chunk = bytes.slice(dataPos, dataPos + dataLen);
+    for(let i = 0; i < bytes.length - 8; i++){
 
-                // INTENTO 1: ¿Es un PNG directo? (Firma 89 50 4E 47)
-                if (chunk[0] === 0x89 && chunk[1] === 0x50 && chunk[2] === 0x4E && chunk[3] === 0x47) {
-                    displayImage(chunk, fileName);
-                    extracted = true;
-                } 
-                // INTENTO 2: ¿Es un flujo Zlib comprimido?
-                else {
-                    try {
-                        const decompressed = pako.inflate(chunk);
-                        displayImage(decompressed, fileName);
-                        extracted = true;
-                    } catch (e) {
-                        // INTENTO 3: Búsqueda agresiva (Deep Scan)
-                        // A veces el offset está movido por unos pocos bytes (cabeceras de bloque)
-                        for (let scan = 1; scan < 16; scan++) {
-                            try {
-                                const subChunk = bytes.slice(dataPos + scan, dataPos + dataLen);
-                                const decompressed = pako.inflate(subChunk);
-                                displayImage(decompressed, fileName);
-                                extracted = true;
-                                break;
-                            } catch (err) {}
-                        }
-                    }
+        if(startSig.every((b,j)=>bytes[i+j]===b)){
+
+            let end = -1;
+
+            for(let j = i; j < bytes.length - 8; j++){
+                if(endSig.every((b,k)=>bytes[j+k]===b)){
+                    end = j + 8;
+                    break;
                 }
-
-                if (extracted) successCount++;
             }
 
-            indexOffset += entrySize;
+            if(end !== -1){
 
-            if (i % 500 === 0) {
-                writeLog(`Procesando: ${i}...`);
-                await new Promise(r => setTimeout(r, 1));
+                let png = bytes.slice(i, end);
+                let blob = new Blob([png], {type:"image/png"});
+                let url = URL.createObjectURL(blob);
+
+                // mostrar imagen
+                let box = document.createElement("div");
+                box.className = "imgBox";
+
+                let img = document.createElement("img");
+                img.src = url;
+
+                let label = document.createElement("div");
+                label.textContent = "img_" + found + ".png";
+
+                let btn = document.createElement("a");
+                btn.href = url;
+                btn.download = "img_" + found + ".png";
+                btn.textContent = "Descargar";
+
+                box.appendChild(img);
+                box.appendChild(label);
+                box.appendChild(btn);
+
+                imgDiv.appendChild(box);
+
+                // agregar al zip
+                zip.file("img_" + found + ".png", png);
+
+                found++;
+                i = end;
             }
         }
 
-        writeLog(`--- PROCESO FINALIZADO ---`);
-        writeLog(`Imágenes recuperadas: ${successCount}`);
-        if (successCount === 0) {
-            writeLog("ERROR: No se detectaron firmas válidas. Es posible que el desplazamiento de datos sea global.");
+        if(i % 2000000 === 0){
+            log("Progreso: " + ((i / bytes.length)*100).toFixed(1) + "%");
+            await new Promise(r => setTimeout(r, 1));
         }
+    }
+
+    log("Total encontrados: " + found);
+
+    if(found === 0){
+        log("⚠ No se encontraron PNG");
+        startBtn.disabled = false;
+        return;
+    }
+
+    log("Generando ZIP...");
+
+    const content = await zip.generateAsync({type:"blob"});
+    const urlZip = URL.createObjectURL(content);
+
+    downloadBtn.onclick = () => {
+        let a = document.createElement("a");
+        a.href = urlZip;
+        a.download = "imagenes_tsao.zip";
+        a.click();
     };
 
-    function displayImage(data, name) {
-        const blob = new Blob([data], { type: 'image/png' });
-        const url = URL.createObjectURL(blob);
-        const div = document.createElement('div');
-        div.className = 'img-card';
-        div.innerHTML = `<img src="${url}"><div style="font-size:10px; color:#aaa">${name}</div>`;
-        document.getElementById('gallery').appendChild(div);
-    }
+    downloadBtn.style.display = "block";
+    startBtn.disabled = false;
+
+    log("✔ Listo");
+};
+
 </script>
 
 </body>
