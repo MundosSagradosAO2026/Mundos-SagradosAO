@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSao FULL FINAL</title>
+<title>Extractor TSao ULTIMATE</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
@@ -16,7 +16,7 @@ img{width:100px;border:1px solid #333;}
 
 <body>
 
-<h2>Extractor TSao FULL FINAL</h2>
+<h2>Extractor TSao ULTIMATE</h2>
 
 <input type="file" id="fileInput"><br><br>
 <button onclick="start()">EXTRAER</button>
@@ -43,28 +43,16 @@ function readString(bytes, offset, len){
     return s.trim();
 }
 
-// 🔍 buscar firmas reales
+// 🔍 firmas
 function findCandidates(data){
     let offsets = [];
-
     for(let i=0;i<data.length-4;i++){
-
-        // PNG
-        if(data[i]===0x89 && data[i+1]===0x50 && data[i+2]===0x4E) offsets.push(i);
-
-        // JPG
-        if(data[i]===0xFF && data[i+1]===0xD8) offsets.push(i);
-
-        // BMP
-        if(data[i]===0x42 && data[i+1]===0x4D) offsets.push(i);
-
-        // ZLIB
-        if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)) offsets.push(i);
-
-        // posibles deflate
-        if(data[i]===0x63 || data[i]===0xED) offsets.push(i);
+        if(data[i]===0x89 && data[i+1]===0x50) offsets.push(i); // PNG
+        if(data[i]===0xFF && data[i+1]===0xD8) offsets.push(i); // JPG
+        if(data[i]===0x42 && data[i+1]===0x4D) offsets.push(i); // BMP
+        if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)) offsets.push(i); // ZLIB
+        if(data[i]===0x63 || data[i]===0xED) offsets.push(i); // deflate posible
     }
-
     return offsets;
 }
 
@@ -74,19 +62,17 @@ function tryInflate(data){
     return null;
 }
 
-// 🧠 crear PNG falso
+// 🧠 PNG fake
 function buildPNG(raw){
 
     function chunk(type, data){
         let len = data.length;
         let out = new Uint8Array(12 + len);
         let dv = new DataView(out.buffer);
-
         dv.setUint32(0, len);
         out.set(type,4);
         out.set(data,8);
         dv.setUint32(8+len, 0);
-
         return out;
     }
 
@@ -99,17 +85,34 @@ function buildPNG(raw){
     ihdr[8]=8;
     ihdr[9]=6;
 
-    let png = new Uint8Array(
-        header.length + 25 + (12+raw.length) + 12
-    );
+    let png = new Uint8Array(header.length + 25 + (12+raw.length) + 12);
 
-    let offset=0;
-    png.set(header,offset); offset+=header.length;
-    png.set(chunk(new TextEncoder().encode("IHDR"), ihdr),offset); offset+=25;
-    png.set(chunk(new TextEncoder().encode("IDAT"), raw),offset); offset+=12+raw.length;
-    png.set(chunk(new TextEncoder().encode("IEND"), new Uint8Array(0)),offset);
+    let o=0;
+    png.set(header,o); o+=header.length;
+    png.set(chunk(new TextEncoder().encode("IHDR"), ihdr),o); o+=25;
+    png.set(chunk(new TextEncoder().encode("IDAT"), raw),o); o+=12+raw.length;
+    png.set(chunk(new TextEncoder().encode("IEND"), new Uint8Array(0)),o);
 
     return png;
+}
+
+// 🎨 dibujar RAW
+function draw(data, w, h, type){
+    let canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+
+    let ctx = canvas.getContext("2d");
+    let imgData = ctx.createImageData(w,h);
+
+    imgData.data.set(data);
+    ctx.putImageData(imgData,0,0);
+
+    let img = document.createElement("img");
+    img.src = canvas.toDataURL();
+    img.title = type;
+
+    imgDiv.appendChild(img);
 }
 
 async function start(){
@@ -155,7 +158,6 @@ async function start(){
         try{
 
             let raw = bytes.slice(f.start, f.start + f.size + 800);
-
             let candidates = findCandidates(raw);
 
             let out = null;
@@ -165,39 +167,26 @@ async function start(){
 
                 let slice = raw.slice(c);
 
-                // PNG
                 if(slice[0]===0x89 && slice[1]===0x50){
-                    out = slice;
-                    mime="image/png";
-                    break;
+                    out = slice; mime="image/png"; break;
                 }
 
-                // JPG
                 if(slice[0]===0xFF && slice[1]===0xD8){
-                    out = slice;
-                    mime="image/jpeg";
-                    break;
+                    out = slice; mime="image/jpeg"; break;
                 }
 
-                // BMP
                 if(slice[0]===0x42 && slice[1]===0x4D){
-                    out = slice;
-                    mime="image/bmp";
-                    break;
+                    out = slice; mime="image/bmp"; break;
                 }
 
                 let infl = tryInflate(slice);
 
                 if(infl){
-
                     if(infl[0]===0x89){
                         out = infl;
-                        mime="image/png";
                     }else{
                         out = buildPNG(infl);
-                        mime="image/png";
                     }
-
                     break;
                 }
             }
@@ -219,33 +208,54 @@ async function start(){
             try{
 
                 let raw = bytes.slice(f.start, f.start + f.size);
-
-                let sizes = [32,64,96,128];
+                let sizes = [16,32,64,96,128];
 
                 for(let s of sizes){
 
-                    let needed = s*s*4;
+                    // RGBA
+                    if(raw.length >= s*s*4){
+                        draw(raw.slice(0,s*s*4), s, s, "RGBA");
+                        ok++; throw "done";
+                    }
 
-                    if(raw.length >= needed){
+                    // RGB
+                    if(raw.length >= s*s*3){
+                        let rgba = new Uint8Array(s*s*4);
+                        for(let i=0,j=0;i<rgba.length;i+=4,j+=3){
+                            rgba[i]=raw[j];
+                            rgba[i+1]=raw[j+1];
+                            rgba[i+2]=raw[j+2];
+                            rgba[i+3]=255;
+                        }
+                        draw(rgba,s,s,"RGB");
+                        ok++; throw "done";
+                    }
 
-                        let canvas = document.createElement("canvas");
-                        canvas.width = s;
-                        canvas.height = s;
+                    // BGR
+                    if(raw.length >= s*s*3){
+                        let rgba = new Uint8Array(s*s*4);
+                        for(let i=0,j=0;i<rgba.length;i+=4,j+=3){
+                            rgba[i]=raw[j+2];
+                            rgba[i+1]=raw[j+1];
+                            rgba[i+2]=raw[j];
+                            rgba[i+3]=255;
+                        }
+                        draw(rgba,s,s,"BGR");
+                        ok++; throw "done";
+                    }
 
-                        let ctx = canvas.getContext("2d");
-                        let imgData = ctx.createImageData(s,s);
-
-                        imgData.data.set(raw.slice(0,needed));
-                        ctx.putImageData(imgData,0,0);
-
-                        let img = document.createElement("img");
-                        img.src = canvas.toDataURL();
-                        img.title = f.name + " RAW";
-
-                        imgDiv.appendChild(img);
-
-                        ok++;
-                        throw "recovered";
+                    // GRAY
+                    if(raw.length >= s*s){
+                        let rgba = new Uint8Array(s*s*4);
+                        for(let i=0;i<s*s;i++){
+                            let v = raw[i];
+                            rgba[i*4]=v;
+                            rgba[i*4+1]=v;
+                            rgba[i*4+2]=v;
+                            rgba[i*4+3]=255;
+                        }
+                        draw(rgba,s,s,"GRAY");
+                        ok++; throw "done";
                     }
                 }
 
@@ -253,7 +263,7 @@ async function start(){
 
             }catch(e){
 
-                if(e !== "recovered"){
+                if(e !== "done"){
                     fail++;
                     if(fail < 20){
                         log("Error en " + f.name);
