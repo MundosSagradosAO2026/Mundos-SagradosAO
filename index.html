@@ -2,67 +2,101 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Detector XOR TSAO</title>
+<title>Extractor TSAO REAL</title>
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
-<body style="background:#000;color:#0f0;font-family:monospace">
+<body style="background:#111;color:#0f0;font-family:monospace">
 
 <input type="file" id="file">
 <div id="log"></div>
 <div id="imgs"></div>
 
 <script>
-const log = (t)=>document.getElementById("log").innerHTML += "> "+t+"<br>";
+const log = t => document.getElementById("log").innerHTML += "> " + t + "<br>";
+
+// clave XOR
+const keyStr = "quierovalecuatro";
+const key = new Uint8Array([...keyStr].map(c => c.charCodeAt(0)));
 
 document.getElementById("file").onchange = async e => {
 
     let file = e.target.files[0];
     let buffer = await file.arrayBuffer();
+    let dv = new DataView(buffer);
     let bytes = new Uint8Array(buffer);
 
     log("Archivo cargado");
 
-    const pngSig = [0x89,0x50,0x4E,0x47];
+    let offset = 0;
 
-    // probar XOR 0-255
-    for(let key=0; key<256; key++){
+    // ===== FILEHEADER =====
+    let totalSize = dv.getUint32(offset, true); offset += 4;
+    let numFiles = dv.getUint16(offset, true); offset += 2;
 
-        for(let i=0;i<100000;i++){ // solo primeras posiciones
+    log("Archivos: " + numFiles);
 
-            let ok = true;
-
-            for(let j=0;j<4;j++){
-                if((bytes[i+j] ^ key) !== pngSig[j]){
-                    ok = false;
-                    break;
-                }
-            }
-
-            if(ok){
-                log("🔥 POSIBLE XOR KEY: " + key);
-
-                // reconstruir archivo XOR completo
-                let decoded = new Uint8Array(bytes.length);
-
-                for(let k=0;k<bytes.length;k++){
-                    decoded[k] = bytes[k] ^ key;
-                }
-
-                // mostrar imagen desde inicio detectado
-                let blob = new Blob([decoded.slice(i, i+50000)], {type:"image/png"});
-                let url = URL.createObjectURL(blob);
-
-                let img = document.createElement("img");
-                img.src = url;
-                img.style.width = "200px";
-
-                document.getElementById("imgs").appendChild(img);
-
-                return;
-            }
-        }
+    // sanity check
+    if(numFiles <= 0 || numFiles > 50000){
+        log("Header inválido, probando offset 12...");
+        offset = 12;
+        totalSize = dv.getUint32(offset, true); offset += 4;
+        numFiles = dv.getUint16(offset, true); offset += 2;
     }
 
-    log("No se encontró XOR simple");
+    let files = [];
+
+    // ===== INFOHEADERS =====
+    for(let i=0;i<numFiles;i++){
+
+        let start = dv.getUint32(offset, true); offset+=4;
+        let size = dv.getUint32(offset, true); offset+=4;
+
+        let nameBytes = new Uint8Array(buffer, offset, 32);
+        let name = new TextDecoder().decode(nameBytes).replace(/\0/g,"");
+        offset+=32;
+
+        let origSize = dv.getUint32(offset, true); offset+=4;
+
+        files.push({start,size,name,origSize});
+    }
+
+    log("Index leído");
+
+    // ===== EXTRAER =====
+    for(let i=0;i<files.length;i++){
+
+        let f = files[i];
+
+        if(f.size <= 0) continue;
+
+        let data = new Uint8Array(buffer.slice(f.start, f.start + f.size));
+
+        // XOR
+        for(let j=0;j<data.length;j++){
+            data[j] ^= key[j % key.length];
+        }
+
+        try {
+            let decompressed = pako.inflate(data);
+
+            let blob = new Blob([decompressed], {type:"image/png"});
+            let url = URL.createObjectURL(blob);
+
+            let img = document.createElement("img");
+            img.src = url;
+            img.style.width = "120px";
+            img.title = f.name || ("img_"+i);
+
+            document.getElementById("imgs").appendChild(img);
+
+        } catch(err){
+            log("Error en archivo " + i);
+        }
+
+        if(i % 50 === 0) await new Promise(r=>setTimeout(r,1));
+    }
+
+    log("FIN");
 };
 </script>
 
