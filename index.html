@@ -2,24 +2,27 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSao ULTIMATE</title>
+<title>Extractor TSao + ZIP</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
 body{background:#0b0b0b;color:#FFD700;font-family:monospace;text-align:center;}
 #log{background:#000;color:#0f0;height:180px;overflow:auto;padding:10px;margin-top:10px;font-size:12px;}
 #images{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,100px);gap:10px;}
 img{width:100px;border:1px solid #333;}
+button{padding:10px;margin:5px;}
 </style>
 </head>
 
 <body>
 
-<h2>Extractor TSao ULTIMATE</h2>
+<h2>Extractor TSao + ZIP</h2>
 
 <input type="file" id="fileInput"><br><br>
 <button onclick="start()">EXTRAER</button>
+<button onclick="downloadZip()">DESCARGAR ZIP</button>
 
 <div id="log"></div>
 <div id="images"></div>
@@ -28,6 +31,9 @@ img{width:100px;border:1px solid #333;}
 
 const logDiv = document.getElementById("log");
 const imgDiv = document.getElementById("images");
+
+let zip = new JSZip();
+let zipCount = 0;
 
 function log(t){
     logDiv.innerHTML += "> " + t + "<br>";
@@ -43,15 +49,14 @@ function readString(bytes, offset, len){
     return s.trim();
 }
 
-// 🔍 firmas
 function findCandidates(data){
     let offsets = [];
     for(let i=0;i<data.length-4;i++){
-        if(data[i]===0x89 && data[i+1]===0x50) offsets.push(i); // PNG
-        if(data[i]===0xFF && data[i+1]===0xD8) offsets.push(i); // JPG
-        if(data[i]===0x42 && data[i+1]===0x4D) offsets.push(i); // BMP
-        if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)) offsets.push(i); // ZLIB
-        if(data[i]===0x63 || data[i]===0xED) offsets.push(i); // deflate posible
+        if(data[i]===0x89 && data[i+1]===0x50) offsets.push(i);
+        if(data[i]===0xFF && data[i+1]===0xD8) offsets.push(i);
+        if(data[i]===0x42 && data[i+1]===0x4D) offsets.push(i);
+        if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)) offsets.push(i);
+        if(data[i]===0x63 || data[i]===0xED) offsets.push(i);
     }
     return offsets;
 }
@@ -62,7 +67,6 @@ function tryInflate(data){
     return null;
 }
 
-// 🧠 PNG fake
 function buildPNG(raw){
 
     function chunk(type, data){
@@ -96,26 +100,36 @@ function buildPNG(raw){
     return png;
 }
 
-// 🎨 dibujar RAW
-function draw(data, w, h, type){
+function addToZip(name, blob){
+    zip.file(name, blob);
+    zipCount++;
+}
+
+function drawAndSave(raw, w, h, name){
+
     let canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
 
     let ctx = canvas.getContext("2d");
     let imgData = ctx.createImageData(w,h);
-
-    imgData.data.set(data);
+    imgData.data.set(raw);
     ctx.putImageData(imgData,0,0);
 
     let img = document.createElement("img");
     img.src = canvas.toDataURL();
-    img.title = type;
-
+    img.title = name;
     imgDiv.appendChild(img);
+
+    canvas.toBlob(blob=>{
+        addToZip(name + ".png", blob);
+    });
 }
 
 async function start(){
+
+    zip = new JSZip();
+    zipCount = 0;
 
     imgDiv.innerHTML="";
     logDiv.innerHTML="";
@@ -142,7 +156,7 @@ async function start(){
     for(let i=0;i<numFiles;i++){
         let start = view.getUint32(offset, true);
         let size = view.getUint32(offset+4, true);
-        let name = readString(bytes, offset+8, 32);
+        let name = readString(bytes, offset+8, 32) || ("img_"+i);
         files.push({start,size,name});
         offset += 44;
     }
@@ -150,6 +164,8 @@ async function start(){
     log("Index leído");
 
     let ok=0, fail=0;
+
+    let sizes = [16,32,64,96,128,256,512,1024];
 
     for(let i=0;i<files.length;i++){
 
@@ -167,17 +183,9 @@ async function start(){
 
                 let slice = raw.slice(c);
 
-                if(slice[0]===0x89 && slice[1]===0x50){
-                    out = slice; mime="image/png"; break;
-                }
-
-                if(slice[0]===0xFF && slice[1]===0xD8){
-                    out = slice; mime="image/jpeg"; break;
-                }
-
-                if(slice[0]===0x42 && slice[1]===0x4D){
-                    out = slice; mime="image/bmp"; break;
-                }
+                if(slice[0]===0x89 && slice[1]===0x50){ out=slice; mime="image/png"; break; }
+                if(slice[0]===0xFF && slice[1]===0xD8){ out=slice; mime="image/jpeg"; break; }
+                if(slice[0]===0x42 && slice[1]===0x4D){ out=slice; mime="image/bmp"; break; }
 
                 let infl = tryInflate(slice);
 
@@ -198,8 +206,9 @@ async function start(){
 
             img.src = URL.createObjectURL(blob);
             img.title = f.name;
-
             imgDiv.appendChild(img);
+
+            addToZip(f.name + (mime==="image/jpeg"?".jpg":".png"), blob);
 
             ok++;
 
@@ -208,53 +217,11 @@ async function start(){
             try{
 
                 let raw = bytes.slice(f.start, f.start + f.size);
-                let sizes = [16,32,64,96,128];
 
                 for(let s of sizes){
 
-                    // RGBA
                     if(raw.length >= s*s*4){
-                        draw(raw.slice(0,s*s*4), s, s, "RGBA");
-                        ok++; throw "done";
-                    }
-
-                    // RGB
-                    if(raw.length >= s*s*3){
-                        let rgba = new Uint8Array(s*s*4);
-                        for(let i=0,j=0;i<rgba.length;i+=4,j+=3){
-                            rgba[i]=raw[j];
-                            rgba[i+1]=raw[j+1];
-                            rgba[i+2]=raw[j+2];
-                            rgba[i+3]=255;
-                        }
-                        draw(rgba,s,s,"RGB");
-                        ok++; throw "done";
-                    }
-
-                    // BGR
-                    if(raw.length >= s*s*3){
-                        let rgba = new Uint8Array(s*s*4);
-                        for(let i=0,j=0;i<rgba.length;i+=4,j+=3){
-                            rgba[i]=raw[j+2];
-                            rgba[i+1]=raw[j+1];
-                            rgba[i+2]=raw[j];
-                            rgba[i+3]=255;
-                        }
-                        draw(rgba,s,s,"BGR");
-                        ok++; throw "done";
-                    }
-
-                    // GRAY
-                    if(raw.length >= s*s){
-                        let rgba = new Uint8Array(s*s*4);
-                        for(let i=0;i<s*s;i++){
-                            let v = raw[i];
-                            rgba[i*4]=v;
-                            rgba[i*4+1]=v;
-                            rgba[i*4+2]=v;
-                            rgba[i*4+3]=255;
-                        }
-                        draw(rgba,s,s,"GRAY");
+                        drawAndSave(raw.slice(0,s*s*4), s, s, f.name);
                         ok++; throw "done";
                     }
                 }
@@ -262,12 +229,9 @@ async function start(){
                 fail++;
 
             }catch(e){
-
-                if(e !== "done"){
+                if(e!=="done"){
                     fail++;
-                    if(fail < 20){
-                        log("Error en " + f.name);
-                    }
+                    if(fail<20) log("Error en " + f.name);
                 }
             }
         }
@@ -279,7 +243,26 @@ async function start(){
 
     log("OK: " + ok);
     log("Errores: " + fail);
-    log("FIN");
+    log("Listo para descargar ZIP ("+zipCount+" archivos)");
+}
+
+async function downloadZip(){
+
+    if(zipCount === 0){
+        alert("Primero extraé imágenes");
+        return;
+    }
+
+    log("Generando ZIP...");
+
+    let blob = await zip.generateAsync({type:"blob"});
+
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "Graficos.zip";
+    a.click();
+
+    log("ZIP descargado!");
 }
 
 </script>
