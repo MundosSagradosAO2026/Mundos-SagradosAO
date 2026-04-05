@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Estructura Real</title>
+    <title>Amnerys Suite - Extractor Final</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
         #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
-        .logo-title { font-size: 2.2em; text-shadow: 0 0 15px #00ff00; color: #fff; }
+        .logo-title { font-size: 2.5em; text-shadow: 0 0 15px #00ff00; color: #fff; }
         .grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; max-width: 600px; }
         .card { background: #1e1e1e; border: 2px solid #333; padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; }
         .card:hover { border-color: #00adb5; background: #252525; }
@@ -17,7 +17,7 @@
         .unpacker-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; flex: 1; overflow: hidden; }
         .side-panel { background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; gap: 10px; }
         .gallery { background: #000; border-radius: 8px; border: 1px solid #333; padding: 15px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-        .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 9px; color: #eee; }
+        .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; }
         .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; background: #222; }
         .btn { padding: 8px 15px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
         .btn-save { background: #28a745; }
@@ -29,7 +29,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE v4</div>
+        <div class="logo-title">AMNERYS SUITE v5</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -51,13 +51,13 @@
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor Grh.tsao (Estructura Corregida)</strong>
+            <strong>Extractor Grh.tsao (Estructura de 46 bytes)</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
-                <label>Cargar Grh.tsao:</label>
+                <label>Archivo Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">EXTRAER AHORA</button>
+                <button class="btn" id="btnRunUnpack">EXTRAER GRÁFICOS</button>
                 <div id="logUnpack">Esperando archivo...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
@@ -110,8 +110,7 @@
 
     function saveInd() {
         const lines = editorArea.value.split('\n');
-        let grhs = [];
-        let totalGrh = 0;
+        let grhs = []; let totalGrh = 0;
         lines.forEach(line => {
             if (line.startsWith('NumGrh=')) totalGrh = parseInt(line.split('=')[1]);
             if (line.startsWith('Grh')) {
@@ -121,7 +120,7 @@
                 grhs.push({ idx, data });
             }
         });
-        const buffer = new ArrayBuffer(grhs.length * 80 + 100);
+        const buffer = new ArrayBuffer(grhs.length * 85 + 100);
         const view = new DataView(buffer);
         let offset = 0;
         view.setInt32(offset, currentVersion, true); offset += 4;
@@ -150,39 +149,40 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- UNPACKER (ESTRUCTURA DE BYTES ANALIZADA) ---
+    // --- UNPACKER SEGÚN TU VOLCADO ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
         if (!dFile) return alert("Selecciona Grh.tsao");
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Analizando...<br>";
+        gall.innerHTML = ""; log.innerHTML = "Procesando bytes...<br>";
 
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
 
-        // Estructura Cabecera Real detectada en tus bytes:
-        // Byte 4-5 es el número de archivos
-        const numFiles = dView.getInt16(4, true);
+        // Cabecera: los primeros 6 bytes según tu volcado
+        const numFiles = dView.getUint16(4, true);
         log.innerHTML += `Archivos: ${numFiles}<br>`;
 
-        let offset = 6; // Inicio de INFOHEADER
-        const recordSize = 48;
+        let offset = 6; // Empieza en el byte 6 (después de 39 07 22 04 db 0c)
+        const infoSize = 46; // La distancia entre el inicio de un nombre y el siguiente
         let count = 0;
 
         for (let i = 0; i < numFiles; i++) {
-            if (offset + recordSize > dBuf.byteLength) break;
+            if (offset + infoSize > dBuf.byteLength) break;
 
-            // LECTURA SEGUN BYTES REALES DEL ARCHIVO:
-            // [0-3] Tamaño comprimido
-            // [4-7] Puntero de inicio (StartPos)
-            // [8-11] Tamaño descomprimido
-            // [12-43] Nombre (1.png, etc)
+            // Estructura basada en tu Hex:
+            // [0-3] StartPos
+            // [4-7] CompressedSize
+            // [8-39] FileName (32 bytes)
+            // [40-43] UncompressedSize
+            // [44-45] Padding/Control
 
-            const compressedSize = dView.getUint32(offset, true);
-            const startPos = dView.getUint32(offset + 4, true);
-            const nameBytes = new Uint8Array(dBuf, offset + 12, 32);
+            const startPos = dView.getUint32(offset, true);
+            const compressedSize = dView.getUint32(offset + 4, true);
+            
+            const nameBytes = new Uint8Array(dBuf, offset + 8, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
 
             if (fName.includes('.png') && compressedSize > 0 && startPos + compressedSize <= dBytes.length) {
@@ -199,10 +199,10 @@
                 } catch (e) { }
             }
 
-            offset += recordSize;
+            offset += infoSize;
 
             if (i % 100 === 0) {
-                log.innerHTML = `Progreso: ${i} / ${numFiles} (Extraídos: ${count})`;
+                log.innerHTML = `Analizando: ${i} / ${numFiles} (Extraídos: ${count})`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
