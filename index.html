@@ -2,183 +2,295 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Editor Graficos.ind - Estilo Retro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AO Graphics Parser - Professional Edition</title>
     <style>
+        :root {
+            --gold: #FFD700;
+            --bg: #0d0d0d;
+            --panel: #1a1a1a;
+            --text: #e0e0e0;
+            --terminal: #00FF41;
+        }
+
         body {
-            background: #0b0b0b;
-            color: #FFD700;
-            font-family: 'Courier New', monospace;
-            text-align: center;
-            padding: 40px;
-        }
-        .box {
-            border: 2px solid #FFD700;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             padding: 20px;
-            max-width: 850px;
-            margin: auto;
-            background: #111;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
         }
-        h2 { text-transform: uppercase; letter-spacing: 2px; }
-        .controls { margin-bottom: 20px; }
-        input[type="file"] {
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--panel);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-top: 0;
+            border-bottom: 2px solid var(--gold);
+            padding-bottom: 10px;
+            font-size: 1.5rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed #444;
+            padding: 40px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: 0.3s;
+            border-radius: 5px;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--gold);
+            background: rgba(255, 215, 0, 0.05);
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
             background: #222;
-            color: #FFD700;
-            padding: 10px;
-            border: 1px dashed #FFD700;
-            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 3px solid var(--gold);
         }
+
+        .stat-card small { color: #888; display: block; margin-bottom: 5px; }
+        .stat-card span { font-weight: bold; font-family: monospace; font-size: 1.2rem; }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
         button {
-            background: #FFD700;
+            background: var(--gold);
             color: #000;
             border: none;
             padding: 12px 25px;
-            margin: 10px;
-            cursor: pointer;
             font-weight: bold;
             text-transform: uppercase;
-            transition: 0.3s;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
         }
-        button:hover {
+
+        button:hover:not(:disabled) {
             background: #fff;
-            box-shadow: 0 0 10px #FFD700;
+            transform: translateY(-2px);
         }
-        pre {
-            text-align: left;
+
+        button:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        #console {
             background: #000;
+            color: var(--terminal);
             padding: 15px;
             height: 400px;
-            overflow: auto;
-            color: #0f0;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
             border: 1px solid #333;
-            font-size: 13px;
+            white-space: pre-wrap;
+            text-align: left;
         }
-        #info {
-            font-weight: bold;
-            margin: 15px 0;
-            color: #fff;
-        }
+
+        .warning { color: #ffab00; }
+        .error { color: #ff4444; }
+        .success { color: var(--terminal); }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <h2>⚔️ Decodificador de Graficos.ind</h2>
-    <p>Convierte archivos binarios de Argentum Online a formato .ini</p>
-
-    <div class="controls">
-        <input type="file" id="fileInput" accept=".ind"><br>
-        <button onclick="procesar()">Leer y Analizar</button>
-        <button onclick="descargar()">Descargar Graficos.ini</button>
+<div class="container">
+    <h1>⚔️ Graficos.ind Parser</h1>
+    
+    <div class="drop-zone" id="dropZone">
+        Arrastra aquí tu archivo <b>Graficos.ind</b> o haz clic para seleccionar
+        <input type="file" id="fileInput" hidden accept=".ind">
     </div>
 
-    <p id="info">Esperando archivo...</p>
-    <pre id="output">Los datos aparecerán aquí...</pre>
+    <div class="stats-bar">
+        <div class="stat-card">
+            <small>VERSIÓN</small>
+            <span id="statVersion">-</span>
+        </div>
+        <div class="stat-card">
+            <small>GRH COUNT (HEADER)</small>
+            <span id="statHeaderCount">-</span>
+        </div>
+        <div class="stat-card">
+            <small>LEÍDOS REALES</small>
+            <span id="statRealCount">-</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btnDescargar" disabled onclick="descargar()">Descargar Graficos.ini</button>
+        <button onclick="location.reload()" style="background: #333; color: white;">Limpiar</button>
+    </div>
+
+    <div id="console">Esperando archivo...</div>
 </div>
 
 <script>
-let iniTexto = "";
+    const MAX_FRAMES_SAFETY = 1000; // Límite de seguridad discutido
+    let finalIni = "";
 
-// Helpers para lectura Little-Endian
-const readLong = (view, offset) => view.getInt32(offset, true);
-const readFloat = (view, offset) => view.getFloat32(offset, true);
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const logArea = document.getElementById('console');
+    const btnDescargar = document.getElementById('btnDescargar');
 
-function procesar() {
-    const file = document.getElementById("fileInput").files[0];
-    if (!file) {
-        alert("Por favor, selecciona un archivo .ind");
-        return;
+    // UI Updates
+    const log = (msg, type = '') => {
+        const div = document.createElement('div');
+        div.className = type;
+        div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logArea.appendChild(div);
+        logArea.scrollTop = logArea.scrollHeight;
+    };
+
+    dropZone.onclick = () => fileInput.click();
+
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+    function handleFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        log(`Cargando archivo: ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
+        
+        reader.onload = function(e) {
+            processBinary(e.target.result);
+        };
+        reader.readAsArrayBuffer(file);
     }
 
-    const reader = new FileReader();
+    function processBinary(buffer) {
+        const view = new DataView(buffer);
+        let offset = 0;
+        let leidos = 0;
+        let warnings = 0;
 
-    reader.onload = function(e) {
         try {
-            const buffer = e.target.result;
-            const view = new DataView(buffer);
-            let offset = 0;
+            // 1. Cabecera
+            const fileVersion = view.getInt32(offset, true); offset += 4;
+            const grhCount = view.getInt32(offset, true); offset += 4;
 
-            // 1. Leer Cabecera
-            const fileVersion = readLong(view, offset); offset += 4;
-            const grhCount = readLong(view, offset); offset += 4;
-            // El tercer Long es el primer índice, pero lo leeremos en el loop
-            
-            let ini = "[INIT]\n";
-            ini += `NumGrh=${grhCount}\n`;
-            ini += `Version=${fileVersion}\n\n`;
-            ini += "[Graphics]\n";
+            document.getElementById('statVersion').innerText = fileVersion;
+            document.getElementById('statHeaderCount').innerText = grhCount;
 
-            let leidos = 0;
+            let ini = `[INIT]\nNumGrh=${grhCount}\nVersion=${fileVersion}\n\n[Graphics]\n`;
 
-            // 2. Leer cada entrada Grh
-            while (offset < view.byteLength) {
-                // Leer Índice del Grh
-                let grhIndex = readLong(view, offset); offset += 4;
+            log(`Iniciando parseo... Versión: ${fileVersion}`, 'success');
 
-                // Si llegamos al 0 final o al límite del archivo
-                if (grhIndex <= 0) break;
+            // 2. Loop principal
+            while (offset + 4 <= view.byteLength) {
+                const grhIndex = view.getInt32(offset, true); offset += 4;
+                
+                if (grhIndex <= 0) {
+                    log("Fin de archivo alcanzado (GrhIndex 0).", "success");
+                    break;
+                }
 
-                let numFrames = readLong(view, offset); offset += 4;
+                const numFrames = view.getInt32(offset, true); offset += 4;
 
                 if (numFrames === 1) {
                     // Gráfico Simple
-                    let fileNum = readLong(view, offset); offset += 4;
-                    let sX = readLong(view, offset); offset += 4;
-                    let sY = readLong(view, offset); offset += 4;
-                    let width = readLong(view, offset); offset += 4;
-                    let height = readLong(view, offset); offset += 4;
+                    const fileNum = view.getInt32(offset, true); offset += 4;
+                    const sX = view.getInt32(offset, true); offset += 4;
+                    const sY = view.getInt32(offset, true); offset += 4;
+                    const width = view.getInt32(offset, true); offset += 4;
+                    const height = view.getInt32(offset, true); offset += 4;
 
                     ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
-                } else {
-                    // Animación (Múltiples Frames)
+                } 
+                else if (numFrames > 1) {
+                    // Animación
                     let frames = [];
-                    for (let i = 0; i < numFrames; i++) {
-                        frames.push(readLong(view, offset));
-                        offset += 4;
-                    }
-                    let speed = readFloat(view, offset); offset += 4;
+                    let frameError = false;
+
+                    // Aplicamos el límite de seguridad MAX_FRAMES_SAFETY
+                    const framesToRead = Math.min(numFrames, MAX_FRAMES_SAFETY);
                     
-                    // Formatear: GrhX=NumFrames-F1-F2-...-Fn-Velocidad
-                    ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${speed.toFixed(2)}\n`;
+                    if (numFrames > MAX_FRAMES_SAFETY) {
+                        log(`Waring: Grh${grhIndex} reporta ${numFrames} frames. Limitando a ${MAX_FRAMES_SAFETY}.`, 'warning');
+                        warnings++;
+                    }
+
+                    for (let i = 0; i < framesToRead; i++) {
+                        if (offset + 4 <= view.byteLength) {
+                            frames.push(view.getInt32(offset, true));
+                            offset += 4;
+                        } else {
+                            frameError = true;
+                            break;
+                        }
+                    }
+
+                    // Si el archivo decía tener más frames de los que leímos por el límite, 
+                    // debemos saltar esos bytes en el offset si queremos seguir leyendo correctamente,
+                    // PERO, como discutimos que los valores gigantes son errores, es mejor romper o limitar.
+                    
+                    const speed = (offset + 4 <= view.byteLength) ? view.getFloat32(offset, true) : 0;
+                    offset += 4;
+
+                    ini += `Grh${grhIndex}=${frames.length}-${frames.join('-')}-${speed.toFixed(0)}\n`;
                 }
 
                 leidos++;
+                
+                // Actualizar contador visual cada 1000 registros para no laguear
+                if (leidos % 1000 === 0) {
+                    document.getElementById('statRealCount').innerText = leidos;
+                }
             }
 
-            iniTexto = ini;
+            finalIni = ini;
+            document.getElementById('statRealCount').innerText = leidos;
+            btnDescargar.disabled = false;
+            log(`Proceso completado. ${leidos} registros procesados con ${warnings} advertencias.`, 'success');
 
-            // Actualizar interfaz
-            document.getElementById("info").innerHTML = 
-                `<span style="color:#0f0">✔ ÉXITO</span> | Versión: ${fileVersion} | Registrados: ${grhCount} | Procesados: ${leidos}`;
-            
-            // Mostrar vista previa (primeros 5000 caracteres)
-            document.getElementById("output").innerText = ini.substring(0, 5000) + "\n\n... (más datos abajo)";
-
-        } catch (error) {
-            console.error(error);
-            document.getElementById("info").innerText = "❌ Error al procesar el archivo binario.";
+        } catch (err) {
+            log(`CRITICAL ERROR: ${err.message}`, 'error');
+            console.error(err);
         }
-    };
-
-    reader.readAsArrayBuffer(file);
-}
-
-function descargar() {
-    if (!iniTexto) {
-        alert("Primero debes procesar un archivo .ind");
-        return;
     }
 
-    const blob = new Blob([iniTexto], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "Graficos.ini";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
+    function descargar() {
+        const blob = new Blob([finalIni], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Graficos.ini';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        log("Archivo descargado correctamente.");
+    }
 </script>
 
 </body>
