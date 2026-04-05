@@ -2,294 +2,142 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AO Graphics Parser - Professional Edition</title>
+    <title>AO IND Parser - Versión Estable</title>
     <style>
-        :root {
-            --gold: #FFD700;
-            --bg: #0d0d0d;
-            --panel: #1a1a1a;
-            --text: #e0e0e0;
-            --terminal: #00FF41;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--panel);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        h1 {
-            color: var(--gold);
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-top: 0;
-            border-bottom: 2px solid var(--gold);
-            padding-bottom: 10px;
-            font-size: 1.5rem;
-        }
-
-        .drop-zone {
-            border: 2px dashed #444;
-            padding: 40px;
-            margin: 20px 0;
-            cursor: pointer;
-            transition: 0.3s;
-            border-radius: 5px;
-        }
-
-        .drop-zone:hover {
-            border-color: var(--gold);
-            background: rgba(255, 215, 0, 0.05);
-        }
-
-        .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: #222;
-            padding: 15px;
-            border-radius: 4px;
-            border-left: 3px solid var(--gold);
-        }
-
-        .stat-card small { color: #888; display: block; margin-bottom: 5px; }
-        .stat-card span { font-weight: bold; font-family: monospace; font-size: 1.2rem; }
-
-        .controls {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        button {
-            background: var(--gold);
-            color: #000;
-            border: none;
-            padding: 12px 25px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: 0.2s;
-        }
-
-        button:hover:not(:disabled) {
-            background: #fff;
-            transform: translateY(-2px);
-        }
-
-        button:disabled {
-            background: #444;
-            color: #888;
-            cursor: not-allowed;
-        }
-
-        #console {
-            background: #000;
-            color: var(--terminal);
-            padding: 15px;
-            height: 400px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 12px;
-            border: 1px solid #333;
-            white-space: pre-wrap;
-            text-align: left;
-        }
-
-        .warning { color: #ffab00; }
-        .error { color: #ff4444; }
-        .success { color: var(--terminal); }
+        body { background: #1a1a1a; color: #eee; font-family: monospace; padding: 20px; text-align: center; }
+        .container { max-width: 800px; margin: auto; background: #252525; padding: 20px; border-radius: 10px; border: 1px solid #FFD700; }
+        #console { background: #000; color: #0f0; padding: 15px; height: 300px; overflow-y: auto; text-align: left; margin: 15px 0; border-radius: 5px; font-size: 12px; }
+        input[type="file"] { margin: 20px 0; }
+        button { background: #FFD700; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .err { color: #ff4444; }
+        .warn { color: #ffa500; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>⚔️ Graficos.ind Parser</h1>
+    <h2>⚔️ Lector Graficos.ind (Estilo Python)</h2>
+    <input type="file" id="fileInput" accept=".ind">
+    <br>
+    <button id="btnProcess" onclick="procesar()">Procesar Archivo</button>
+    <button id="btnDownload" onclick="descargar()" disabled>Descargar .ini</button>
     
-    <div class="drop-zone" id="dropZone">
-        Arrastra aquí tu archivo <b>Graficos.ind</b> o haz clic para seleccionar
-        <input type="file" id="fileInput" hidden accept=".ind">
-    </div>
-
-    <div class="stats-bar">
-        <div class="stat-card">
-            <small>VERSIÓN</small>
-            <span id="statVersion">-</span>
-        </div>
-        <div class="stat-card">
-            <small>GRH COUNT (HEADER)</small>
-            <span id="statHeaderCount">-</span>
-        </div>
-        <div class="stat-card">
-            <small>LEÍDOS REALES</small>
-            <span id="statRealCount">-</span>
-        </div>
-    </div>
-
-    <div class="controls">
-        <button id="btnDescargar" disabled onclick="descargar()">Descargar Graficos.ini</button>
-        <button onclick="location.reload()" style="background: #333; color: white;">Limpiar</button>
-    </div>
-
-    <div id="console">Esperando archivo...</div>
+    <div id="console">Selecciona el archivo para empezar...</div>
 </div>
 
 <script>
-    const MAX_FRAMES_SAFETY = 1000; // Límite de seguridad discutido
-    let finalIni = "";
+    let resultadoIni = "";
+    const MAX_FRAMES = 1000; // El mismo límite que usamos en Python
 
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const logArea = document.getElementById('console');
-    const btnDescargar = document.getElementById('btnDescargar');
+    function log(msg, cls = "") {
+        const div = document.createElement("div");
+        div.className = cls;
+        div.innerText = `> ${msg}`;
+        const con = document.getElementById("console");
+        con.appendChild(div);
+        con.scrollTop = con.scrollHeight;
+    }
 
-    // UI Updates
-    const log = (msg, type = '') => {
-        const div = document.createElement('div');
-        div.className = type;
-        div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        logArea.appendChild(div);
-        logArea.scrollTop = logArea.scrollHeight;
-    };
+    function procesar() {
+        const file = document.getElementById("fileInput").files[0];
+        if (!file) return alert("Selecciona un archivo");
 
-    dropZone.onclick = () => fileInput.click();
-
-    fileInput.onchange = (e) => handleFile(e.target.files[0]);
-
-    function handleFile(file) {
-        if (!file) return;
         const reader = new FileReader();
-        log(`Cargando archivo: ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
-        
+        document.getElementById("console").innerHTML = "";
+        log(`Leyendo ${file.name}...`);
+
         reader.onload = function(e) {
-            processBinary(e.target.result);
+            const view = new DataView(e.target.result);
+            let offset = 0;
+            let leidos = 0;
+
+            try {
+                // Leer Cabecera (Longs de 4 bytes)
+                const version = view.getInt32(offset, true); offset += 4;
+                const totalGrhs = view.getInt32(offset, true); offset += 4;
+
+                let ini = `[INIT]\nNumGrh=${totalGrhs}\nVersion=${version}\n\n[Graphics]\n`;
+                log(`Header detectado: Versión ${version}, Total: ${totalGrhs}`);
+
+                // Empezar lectura de datos
+                while (offset + 4 <= view.byteLength) {
+                    const grhIndex = view.getInt32(offset, true); offset += 4;
+                    
+                    // Si el índice es 0, terminamos (Fin de archivo estándar AO)
+                    if (grhIndex === 0) break;
+
+                    // Si el índice es muy loco, probablemente nos desalineamos
+                    if (grhIndex < 0 || grhIndex > 1000000) {
+                        log(`Error de alineación en byte ${offset}. Índice inválido: ${grhIndex}`, "err");
+                        break;
+                    }
+
+                    const numFrames = view.getInt32(offset, true); offset += 4;
+
+                    if (numFrames === 1) {
+                        // Gráfico Estático
+                        const fileNum = view.getInt32(offset, true); offset += 4;
+                        const sX = view.getInt32(offset, true); offset += 4;
+                        const sY = view.getInt32(offset, true); offset += 4;
+                        const w = view.getInt32(offset, true); offset += 4;
+                        const h = view.getInt32(offset, true); offset += 4;
+
+                        ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${w}-${h}\n`;
+                    } 
+                    else if (numFrames > 1) {
+                        // Animación
+                        let frames = [];
+                        
+                        // Lógica de seguridad para NumFrames gigantes
+                        const realFramesToRead = Math.min(numFrames, MAX_FRAMES);
+                        if (numFrames > MAX_FRAMES) {
+                            log(`Grh${grhIndex}: NumFrames excesivo (${numFrames}). Limitando a ${MAX_FRAMES}.`, "warn");
+                        }
+
+                        for (let i = 0; i < realFramesToRead; i++) {
+                            if (offset + 4 <= view.byteLength) {
+                                frames.push(view.getInt32(offset, true));
+                                offset += 4;
+                            }
+                        }
+
+                        // Si el archivo tenía más frames de los que leímos, saltamos el resto 
+                        // para intentar seguir con el siguiente GrhIndex
+                        if (numFrames > MAX_FRAMES) {
+                            const bytesToSkip = (numFrames - MAX_FRAMES) * 4;
+                            offset += bytesToSkip;
+                        }
+
+                        // Velocidad (Float)
+                        const speed = (offset + 4 <= view.byteLength) ? view.getFloat32(offset, true) : 0;
+                        offset += 4;
+
+                        ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${Math.round(speed)}\n`;
+                    }
+
+                    leidos++;
+                    if (leidos % 5000 === 0) log(`Procesados ${leidos} registros...`);
+                }
+
+                resultadoIni = ini;
+                document.getElementById("btnDownload").disabled = false;
+                log(`¡Éxito! Se leyeron ${leidos} gráficos.`, "success");
+
+            } catch (err) {
+                log(`Error crítico: ${err.message}`, "err");
+            }
         };
         reader.readAsArrayBuffer(file);
     }
 
-    function processBinary(buffer) {
-        const view = new DataView(buffer);
-        let offset = 0;
-        let leidos = 0;
-        let warnings = 0;
-
-        try {
-            // 1. Cabecera
-            const fileVersion = view.getInt32(offset, true); offset += 4;
-            const grhCount = view.getInt32(offset, true); offset += 4;
-
-            document.getElementById('statVersion').innerText = fileVersion;
-            document.getElementById('statHeaderCount').innerText = grhCount;
-
-            let ini = `[INIT]\nNumGrh=${grhCount}\nVersion=${fileVersion}\n\n[Graphics]\n`;
-
-            log(`Iniciando parseo... Versión: ${fileVersion}`, 'success');
-
-            // 2. Loop principal
-            while (offset + 4 <= view.byteLength) {
-                const grhIndex = view.getInt32(offset, true); offset += 4;
-                
-                if (grhIndex <= 0) {
-                    log("Fin de archivo alcanzado (GrhIndex 0).", "success");
-                    break;
-                }
-
-                const numFrames = view.getInt32(offset, true); offset += 4;
-
-                if (numFrames === 1) {
-                    // Gráfico Simple
-                    const fileNum = view.getInt32(offset, true); offset += 4;
-                    const sX = view.getInt32(offset, true); offset += 4;
-                    const sY = view.getInt32(offset, true); offset += 4;
-                    const width = view.getInt32(offset, true); offset += 4;
-                    const height = view.getInt32(offset, true); offset += 4;
-
-                    ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
-                } 
-                else if (numFrames > 1) {
-                    // Animación
-                    let frames = [];
-                    let frameError = false;
-
-                    // Aplicamos el límite de seguridad MAX_FRAMES_SAFETY
-                    const framesToRead = Math.min(numFrames, MAX_FRAMES_SAFETY);
-                    
-                    if (numFrames > MAX_FRAMES_SAFETY) {
-                        log(`Waring: Grh${grhIndex} reporta ${numFrames} frames. Limitando a ${MAX_FRAMES_SAFETY}.`, 'warning');
-                        warnings++;
-                    }
-
-                    for (let i = 0; i < framesToRead; i++) {
-                        if (offset + 4 <= view.byteLength) {
-                            frames.push(view.getInt32(offset, true));
-                            offset += 4;
-                        } else {
-                            frameError = true;
-                            break;
-                        }
-                    }
-
-                    // Si el archivo decía tener más frames de los que leímos por el límite, 
-                    // debemos saltar esos bytes en el offset si queremos seguir leyendo correctamente,
-                    // PERO, como discutimos que los valores gigantes son errores, es mejor romper o limitar.
-                    
-                    const speed = (offset + 4 <= view.byteLength) ? view.getFloat32(offset, true) : 0;
-                    offset += 4;
-
-                    ini += `Grh${grhIndex}=${frames.length}-${frames.join('-')}-${speed.toFixed(0)}\n`;
-                }
-
-                leidos++;
-                
-                // Actualizar contador visual cada 1000 registros para no laguear
-                if (leidos % 1000 === 0) {
-                    document.getElementById('statRealCount').innerText = leidos;
-                }
-            }
-
-            finalIni = ini;
-            document.getElementById('statRealCount').innerText = leidos;
-            btnDescargar.disabled = false;
-            log(`Proceso completado. ${leidos} registros procesados con ${warnings} advertencias.`, 'success');
-
-        } catch (err) {
-            log(`CRITICAL ERROR: ${err.message}`, 'error');
-            console.error(err);
-        }
-    }
-
     function descargar() {
-        const blob = new Blob([finalIni], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const blob = new Blob([resultadoIni], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'Graficos.ini';
-        document.body.appendChild(a);
+        a.download = "Graficos.ini";
         a.click();
-        window.URL.revokeObjectURL(url);
-        log("Archivo descargado correctamente.");
     }
 </script>
 
