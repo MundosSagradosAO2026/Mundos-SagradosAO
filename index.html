@@ -1,144 +1,355 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>AO IND Parser - Versión Estable</title>
-    <style>
-        body { background: #1a1a1a; color: #eee; font-family: monospace; padding: 20px; text-align: center; }
-        .container { max-width: 800px; margin: auto; background: #252525; padding: 20px; border-radius: 10px; border: 1px solid #FFD700; }
-        #console { background: #000; color: #0f0; padding: 15px; height: 300px; overflow-y: auto; text-align: left; margin: 15px 0; border-radius: 5px; font-size: 12px; }
-        input[type="file"] { margin: 20px 0; }
-        button { background: #FFD700; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        .err { color: #ff4444; }
-        .warn { color: #ffa500; }
-    </style>
+<meta charset="UTF-8">
+<title>Editor Graficos.ind PRO</title>
+
+<style>
+body{
+    background:#0b0b0b;
+    color:#FFD700;
+    font-family: monospace;
+    text-align:center;
+    padding:40px;
+}
+.box{
+    border:1px solid #FFD700;
+    padding:20px;
+    max-width:900px;
+    margin:auto;
+    background:#111;
+}
+button{
+    background:#FFD700;
+    border:none;
+    padding:10px 20px;
+    margin:10px;
+    cursor:pointer;
+    font-weight:bold;
+}
+pre{
+    text-align:left;
+    background:#000;
+    padding:10px;
+    height:300px;
+    overflow:auto;
+    color:#0f0;
+}
+textarea{
+    width:100%;
+    height:200px;
+    background:#000;
+    color:#0f0;
+    margin-top:10px;
+}
+.progress{
+    width:100%;
+    background:#222;
+    height:20px;
+    margin-top:15px;
+    border:1px solid #FFD700;
+}
+.bar{
+    height:100%;
+    width:0%;
+    background:#FFD700;
+}
+</style>
 </head>
+
 <body>
 
-<div class="container">
-    <h2>⚔️ Lector Graficos.ind (Estilo Python)</h2>
-    <input type="file" id="fileInput" accept=".ind">
-    <br>
-    <button id="btnProcess" onclick="procesar()">Procesar Archivo</button>
-    <button id="btnDownload" onclick="descargar()" disabled>Descargar .ini</button>
-    
-    <div id="console">Selecciona el archivo para empezar...</div>
+<div class="box">
+<h2>📦 Editor Graficos.ind PRO</h2>
+
+<input type="file" id="fileInput"><br>
+
+<button onclick="leerIND()">Leer .IND</button>
+<button onclick="descargarINI()">Descargar .INI</button>
+<button onclick="generarIND()">Generar .IND desde INI</button>
+
+<div class="progress">
+<div class="bar" id="bar"></div>
+</div>
+
+<p id="info"></p>
+
+<pre id="output"></pre>
+
+<h3>✏ Editor INI</h3>
+<textarea id="iniEditor"></textarea>
+
 </div>
 
 <script>
-    let resultadoIni = "";
-    const MAX_FRAMES = 1000; // El mismo límite que usamos en Python
 
-    function log(msg, cls = "") {
-        const div = document.createElement("div");
-        div.className = cls;
-        div.innerText = `> ${msg}`;
-        const con = document.getElementById("console");
-        con.appendChild(div);
-        con.scrollTop = con.scrollHeight;
-    }
+let iniTexto = "";
 
-    function procesar() {
-        const file = document.getElementById("fileInput").files[0];
-        if (!file) return alert("Selecciona un archivo");
+/* =========================
+   LECTURA BINARIA SEGURA
+========================= */
 
-        const reader = new FileReader();
-        document.getElementById("console").innerHTML = "";
-        log(`Leyendo ${file.name}...`);
+function leerIND(){
 
-        reader.onload = function(e) {
+    const file = document.getElementById("fileInput").files[0];
+    if(!file) return alert("Subí un .ind");
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+
+        try{
+
             const view = new DataView(e.target.result);
+
             let offset = 0;
+            const total = view.byteLength;
+
+            function canRead(n){
+                return offset + n <= total;
+            }
+
+            function readLong(){
+                if(!canRead(4)) throw "EOF Long";
+                let v = view.getInt32(offset, true);
+                offset+=4;
+                return v;
+            }
+
+            function readFloat(){
+                if(!canRead(4)) throw "EOF Float";
+                let v = view.getFloat32(offset, true);
+                offset+=4;
+                return v;
+            }
+
+            let version = readLong();
+            let grhCount = readLong();
+
+            let ini = "[INIT]\n";
+            ini += "NumGrh=" + grhCount + "\n";
+            ini += "Version=" + version + "\n\n";
+            ini += "[Graphics]\n";
+
             let leidos = 0;
 
-            try {
-                // Leer Cabecera (Longs de 4 bytes)
-                const version = view.getInt32(offset, true); offset += 4;
-                const totalGrhs = view.getInt32(offset, true); offset += 4;
+            while(canRead(4)){
 
-                let ini = `[INIT]\nNumGrh=${totalGrhs}\nVersion=${version}\n\n[Graphics]\n`;
-                log(`Header detectado: Versión ${version}, Total: ${totalGrhs}`);
+                let grhIndex = readLong();
+                if(grhIndex === 0) break;
 
-                // Empezar lectura de datos
-                while (offset + 4 <= view.byteLength) {
-                    const grhIndex = view.getInt32(offset, true); offset += 4;
-                    
-                    // Si el índice es 0, terminamos (Fin de archivo estándar AO)
-                    if (grhIndex === 0) break;
+                let numFrames = readLong();
 
-                    // Si el índice es muy loco, probablemente nos desalineamos
-                    if (grhIndex < 0 || grhIndex > 1000000) {
-                        log(`Error de alineación en byte ${offset}. Índice inválido: ${grhIndex}`, "err");
-                        break;
-                    }
-
-                    const numFrames = view.getInt32(offset, true); offset += 4;
-
-                    if (numFrames === 1) {
-                        // Gráfico Estático
-                        const fileNum = view.getInt32(offset, true); offset += 4;
-                        const sX = view.getInt32(offset, true); offset += 4;
-                        const sY = view.getInt32(offset, true); offset += 4;
-                        const w = view.getInt32(offset, true); offset += 4;
-                        const h = view.getInt32(offset, true); offset += 4;
-
-                        ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${w}-${h}\n`;
-                    } 
-                    else if (numFrames > 1) {
-                        // Animación
-                        let frames = [];
-                        
-                        // Lógica de seguridad para NumFrames gigantes
-                        const realFramesToRead = Math.min(numFrames, MAX_FRAMES);
-                        if (numFrames > MAX_FRAMES) {
-                            log(`Grh${grhIndex}: NumFrames excesivo (${numFrames}). Limitando a ${MAX_FRAMES}.`, "warn");
-                        }
-
-                        for (let i = 0; i < realFramesToRead; i++) {
-                            if (offset + 4 <= view.byteLength) {
-                                frames.push(view.getInt32(offset, true));
-                                offset += 4;
-                            }
-                        }
-
-                        // Si el archivo tenía más frames de los que leímos, saltamos el resto 
-                        // para intentar seguir con el siguiente GrhIndex
-                        if (numFrames > MAX_FRAMES) {
-                            const bytesToSkip = (numFrames - MAX_FRAMES) * 4;
-                            offset += bytesToSkip;
-                        }
-
-                        // Velocidad (Float)
-                        const speed = (offset + 4 <= view.byteLength) ? view.getFloat32(offset, true) : 0;
-                        offset += 4;
-
-                        ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${Math.round(speed)}\n`;
-                    }
-
-                    leidos++;
-                    if (leidos % 5000 === 0) log(`Procesados ${leidos} registros...`);
+                if(numFrames <= 0){
+                    console.warn("Frame inválido", grhIndex);
+                    break;
                 }
 
-                resultadoIni = ini;
-                document.getElementById("btnDownload").disabled = false;
-                log(`¡Éxito! Se leyeron ${leidos} gráficos.`, "success");
+                if(numFrames === 1){
 
-            } catch (err) {
-                log(`Error crítico: ${err.message}`, "err");
+                    if(!canRead(20)) break;
+
+                    let fileNum = readLong();
+                    let sX = readLong();
+                    let sY = readLong();
+                    let w = readLong();
+                    let h = readLong();
+
+                    ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${w}-${h}\n`;
+
+                    if(grhIndex === 32761 && fileNum !== 5002){
+                        console.warn("⚠ Grh 32761 incorrecto");
+                    }
+
+                }else{
+
+                    let frames = [];
+
+                    for(let i=0;i<numFrames;i++){
+                        frames.push(readLong());
+                    }
+
+                    let speed = readFloat();
+                    speed = speed.toFixed(2);
+
+                    ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${speed}\n`;
+                }
+
+                leidos++;
+
+                if(leidos % 200 === 0){
+                    let p = (offset / total) * 100;
+                    document.getElementById("bar").style.width = p + "%";
+                }
             }
-        };
-        reader.readAsArrayBuffer(file);
+
+            iniTexto = ini;
+            document.getElementById("iniEditor").value = ini;
+
+            document.getElementById("bar").style.width = "100%";
+
+            document.getElementById("info").innerText =
+                `✔ Version: ${version} | Declarados: ${grhCount} | Leídos: ${leidos}`;
+
+            document.getElementById("output").innerText =
+                ini.substring(0, 3000);
+
+        }catch(err){
+            document.getElementById("output").innerText = "ERROR: " + err;
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+/* =========================
+   DESCARGAR INI
+========================= */
+
+function descargarINI(){
+
+    let txt = document.getElementById("iniEditor").value;
+    if(!txt) return alert("No hay INI");
+
+    let blob = new Blob([txt], {type:"text/plain"});
+    let a = document.createElement("a");
+
+    a.href = URL.createObjectURL(blob);
+    a.download = "Graficos.ini";
+    a.click();
+}
+
+/* =========================
+   GENERAR IND DESDE INI
+========================= */
+
+function generarIND(){
+
+    let txt = document.getElementById("iniEditor").value;
+    if(!txt) return alert("Pegá un INI");
+
+    let lines = txt.split("\n");
+
+    let version = 0;
+    let numGrh = 0;
+
+    let graficos = [];
+
+    for(let l of lines){
+
+        l = l.trim();
+
+        if(l.startsWith("Version=")){
+            version = parseInt(l.split("=")[1]);
+        }
+
+        if(l.startsWith("NumGrh=")){
+            numGrh = parseInt(l.split("=")[1]);
+        }
+
+        if(l.startsWith("Grh")){
+
+            let [id, data] = l.split("=");
+
+            let index = parseInt(id.replace("Grh",""));
+            let parts = data.split("-").map(Number);
+
+            let numFrames = parts[0];
+
+            if(numFrames === 1){
+
+                graficos.push({
+                    index,
+                    numFrames,
+                    fileNum: parts[1],
+                    sX: parts[2],
+                    sY: parts[3],
+                    w: parts[4],
+                    h: parts[5]
+                });
+
+            }else{
+
+                let frames = parts.slice(1, 1 + numFrames);
+                let speed = parts[1 + numFrames];
+
+                graficos.push({
+                    index,
+                    numFrames,
+                    frames,
+                    speed
+                });
+            }
+        }
     }
 
-    function descargar() {
-        const blob = new Blob([resultadoIni], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "Graficos.ini";
-        a.click();
+    // ordenar
+    graficos.sort((a,b)=>a.index-b.index);
+
+    let size = 8;
+
+    graficos.forEach(g=>{
+        size += 8;
+
+        if(g.numFrames === 1){
+            size += 20;
+        }else{
+            size += (g.numFrames * 4) + 4;
+        }
+    });
+
+    size += 4;
+
+    let buffer = new ArrayBuffer(size);
+    let view = new DataView(buffer);
+
+    let offset = 0;
+
+    function writeLong(v){
+        view.setInt32(offset, v, true);
+        offset+=4;
     }
+
+    function writeFloat(v){
+        view.setFloat32(offset, v, true);
+        offset+=4;
+    }
+
+    writeLong(version);
+    writeLong(numGrh);
+
+    graficos.forEach(g=>{
+
+        writeLong(g.index);
+        writeLong(g.numFrames);
+
+        if(g.numFrames === 1){
+
+            writeLong(g.fileNum);
+            writeLong(g.sX);
+            writeLong(g.sY);
+            writeLong(g.w);
+            writeLong(g.h);
+
+        }else{
+
+            g.frames.forEach(f=>writeLong(f));
+            writeFloat(parseFloat(g.speed));
+        }
+    });
+
+    writeLong(0);
+
+    let blob = new Blob([buffer], {type:"application/octet-stream"});
+
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "Graficos.ind";
+    a.click();
+
+    alert("✔ IND generado correctamente");
+}
+
 </script>
 
 </body>
