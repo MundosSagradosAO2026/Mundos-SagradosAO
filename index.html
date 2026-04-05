@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Editor & Unpacker V3</title>
+    <title>Amnerys Suite - Editor & Unpacker Final</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -55,7 +55,7 @@
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
-                <label>Solo necesitas Grh.tsao:</label>
+                <label>Cargar Grh.tsao:</label>
                 <input type="file" id="fileData">
                 <button class="btn" id="btnRunUnpack">EXTRAER IMÁGENES</button>
                 <div id="logUnpack">Esperando archivo...</div>
@@ -75,7 +75,7 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- LÓGICA EDITOR .IND ---
+    // --- LÓGICA EDITOR .IND (IDÉNTICA A LA TUYA) ---
     const editorArea = document.getElementById('editor');
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
@@ -150,7 +150,7 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- LÓGICA UNPACKER (ESTRUCTURA DE 48 BYTES DETECTADA) ---
+    // --- LÓGICA UNPACKER (SEGÚN TU ANÁLISIS) ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
         if (!dFile) return alert("Carga Grh.tsao");
@@ -161,21 +161,27 @@
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
-        const key = "quierovalecuatro";
-        const datCM = key.split('').map(c => c.charCodeAt(0));
 
-        // Estructura detectada: 
-        // [0-3] Tamaño total ofuscado
-        // [4-5] Cantidad de archivos
+        // PasswordPak constante mágica de tu análisis
+        const PasswordPak = 435098;
+        const ofuscatedSize = dView.getInt32(0, true);
+        const realSize = ofuscatedSize - PasswordPak;
         const numFiles = dView.getInt16(4, true);
-        log.innerHTML += `Archivos: ${numFiles}<br>`;
 
-        let offset = 6; // Saltar cabecera
-        const infoHeaderSize = 48;
+        log.innerHTML += `Archivos: ${numFiles}<br>Tamaño Real: ${realSize}<br>`;
+
+        let offset = 6; // Saltar FILEHEADER (6 bytes)
+        const infoHeaderSize = 48; // Según tu análisis
 
         for (let i = 0; i < numFiles; i++) {
             if (offset + infoHeaderSize > dBuf.byteLength) break;
 
+            // Según tu INFOHEADER:
+            // [0-3] lngFileStart (Long)
+            // [4-7] lngFileSize (Long)
+            // [8-39] strFileName (String*32)
+            // [40-43] lngFileSizeUncompressed (Long)
+            
             const startPos = dView.getUint32(offset, true);
             const size = dView.getUint32(offset + 4, true);
             let nameBytes = new Uint8Array(dBuf, offset + 8, 32);
@@ -186,19 +192,20 @@
             if (size > 0 && startPos + size <= dBytes.length) {
                 try {
                     let chunk = dBytes.slice(startPos, startPos + size);
-                    // Aplicar XOR si es necesario
-                    for (let j = 0; j < chunk.length; j++) chunk[j] ^= datCM[j % datCM.length];
-                    
+                    // Descomprimir con Zlib (Pako)
                     const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
+                    
                     const div = document.createElement('div');
                     div.className = 'img-card';
                     div.innerHTML = `<img src="${url}"><br>${fName}`;
                     gall.appendChild(div);
-                } catch (e) {}
+                } catch (e) {
+                    // console.log("Error descomprimiendo " + fName);
+                }
             }
             if (i % 50 === 0) {
-                log.innerHTML = `Extrayendo: ${i} / ${numFiles}`;
+                log.innerHTML = `Extrayendo: ${i} / ${numFiles}...`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
