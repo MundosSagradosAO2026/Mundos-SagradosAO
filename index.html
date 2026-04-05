@@ -1,97 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>TSAO FIX FINAL</title>
-<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-</head>
-<body style="background:#000;color:#0f0;font-family:monospace">
+<title>Extractor TSao PRO</title>
 
-<input type="file" id="file">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
+<style>
+body{
+    background:#0b0b0b;
+    color:#FFD700;
+    font-family: monospace;
+    text-align:center;
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+}
+
+#log{
+    background:#000;
+    color:#00ff00;
+    height:150px;
+    overflow:auto;
+    padding:10px;
+    margin-top:10px;
+    font-size:12px;
+}
+
+#images{
+    margin-top:20px;
+    display:grid;
+    grid-template-columns: repeat(auto-fill, 100px);
+    gap:10px;
+    justify-content:center;
+}
+
+img{
+    width:100px;
+    border:1px solid #333;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h2>Extractor Grh.tsao</h2>
+
+<input type="file" id="fileInput">
+<br><br>
+<button onclick="start()">EXTRAER</button>
+
 <div id="log"></div>
-<div id="imgs"></div>
+<div id="images"></div>
+
+</div>
 
 <script>
-const log = t => document.getElementById("log").innerHTML += "> "+t+"<br>";
 
+const logDiv = document.getElementById("log");
+const imgDiv = document.getElementById("images");
+
+function log(t){
+    logDiv.innerHTML += "> " + t + "<br>";
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+// clave VB6
 const keyStr = "quierovalecuatro";
 const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
 
-document.getElementById("file").onchange = async e => {
+function readString(bytes, offset, len){
+    let s="";
+    for(let i=0;i<len;i++){
+        if(bytes[offset+i]===0) break;
+        s+=String.fromCharCode(bytes[offset+i]);
+    }
+    return s.trim();
+}
 
-    let buffer = await e.target.files[0].arrayBuffer();
-    let dv = new DataView(buffer);
-    let bytes = new Uint8Array(buffer);
+async function start(){
 
-    log("Buscando entradas PNG...");
+    imgDiv.innerHTML="";
+    logDiv.innerHTML="";
+
+    const file = document.getElementById("fileInput").files[0];
+    if(!file) return alert("Seleccioná archivo");
+
+    log("Cargando archivo...");
+
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    const view = new DataView(buffer);
+
+    // HEADER
+    let numFiles = view.getUint16(4, true);
+
+    // fallback offset VB6
+    if(numFiles<=0 || numFiles>50000){
+        numFiles = view.getUint16(12, true);
+        log("Header corregido");
+    }
+
+    log("Archivos: " + numFiles);
+
+    let offset = 6;
+
+    if(numFiles>50000) offset = 14;
 
     let files = [];
 
-    // 🔍 buscar ".png" en texto plano
-    for(let i=0;i<bytes.length-4;i++){
+    for(let i=0;i<numFiles;i++){
 
-        if(
-            bytes[i] === 0x2E && // .
-            bytes[i+1] === 0x70 && // p
-            bytes[i+2] === 0x6E && // n
-            bytes[i+3] === 0x67 // g
-        ){
+        let start = view.getUint32(offset, true);
+        let size = view.getUint32(offset+4, true);
+        let name = readString(bytes, offset+8, 32);
+        let usize = view.getUint32(offset+40, true);
 
-            let nameStart = i-1;
-            while(nameStart>0 && bytes[nameStart] !== 0x00) nameStart--;
+        files.push({start,size,name,usize});
 
-            let nameBytes = bytes.slice(nameStart+1, nameStart+33);
-            let name = new TextDecoder().decode(nameBytes).replace(/\0/g,"");
-
-            // retroceder para leer estructura
-            let entryPos = nameStart - 8;
-
-            let start = dv.getUint32(entryPos, true);
-            let size  = dv.getUint32(entryPos+4, true);
-            let orig  = dv.getUint32(nameStart+32, true);
-
-            files.push({start,size,orig,name});
-        }
+        offset += 44;
     }
 
-    log("Encontrados: " + files.length);
+    log("Index leído");
 
-    // 🧪 extraer
+    let ok = 0;
+    let fail = 0;
+
     for(let i=0;i<files.length;i++){
 
         let f = files[i];
 
-        if(f.size <= 0) continue;
-
-        let data = new Uint8Array(buffer.slice(f.start, f.start + f.size));
-
-        // XOR real
-        for(let j=0;j<data.length;j++){
-            data[j] ^= key[j % key.length];
-        }
-
         try{
-            let dec = pako.inflate(data);
 
-            let blob = new Blob([dec], {type:"image/png"});
+            let data = bytes.slice(f.start, f.start + f.size);
+
+            // XOR CORRECTO (SOLO PRIMEROS BYTES)
+            for(let j=0;j<key.length && j<data.length;j++){
+                data[j] ^= key[j];
+            }
+
+            let decompressed = pako.inflate(data);
+
+            let blob = new Blob([decompressed], {type:"image/png"});
             let url = URL.createObjectURL(blob);
 
             let img = document.createElement("img");
             img.src = url;
-            img.style.width = "100px";
             img.title = f.name;
 
-            document.getElementById("imgs").appendChild(img);
+            imgDiv.appendChild(img);
+
+            ok++;
 
         }catch(e){
-            log("Error en " + f.name);
+            fail++;
+            if(fail < 30){
+                log("Error en " + f.name);
+            }
         }
 
-        if(i % 50 === 0) await new Promise(r=>setTimeout(r,1));
+        if(i % 50 === 0){
+            await new Promise(r=>setTimeout(r,1));
+        }
     }
 
+    log("OK: " + ok);
+    log("Errores: " + fail);
     log("FIN");
-};
+
+}
+
 </script>
 
 </body>
