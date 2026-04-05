@@ -6,165 +6,165 @@
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
         
-        /* --- ESTILOS DEL MENÚ PRINCIPAL --- */
-        #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; transition: 0.3s; }
+        /* --- NAVEGACIÓN GENERAL --- */
+        .view { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
+        .active { display: flex !important; }
+
+        /* --- MENÚ PRINCIPAL --- */
+        #mainMenu { align-items: center; justify-content: center; gap: 20px; }
         .logo-title { font-size: 3em; text-shadow: 0 0 15px #00ff00; margin-bottom: 20px; color: #fff; }
-        .grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; width: 80%; max-width: 800px; }
+        .grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; }
         .card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
         .card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; box-shadow: 0 5px 20px rgba(0, 173, 181, 0.3); }
-        .card i { font-size: 2em; display: block; margin-bottom: 10px; }
+        .card i { font-size: 2.5em; display: block; margin-bottom: 15px; }
 
-        /* --- ESTILOS DEL EDITOR --- */
-        #editorContainer { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
-        .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; flex-wrap: wrap; }
-        
-        .editor-layout { display: flex; gap: 15px; flex: 1; overflow: hidden; }
-        #editor { flex: 2; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-size: 14px; resize: none; outline: none; border-radius: 4px; }
-        
-        /* --- PANEL DE VALIDACIÓN --- */
-        #validatorPanel { flex: 1; background: #111; border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; }
-        .val-header { background: #222; padding: 10px; font-size: 12px; border-bottom: 1px solid #333; color: #00adb5; font-weight: bold; }
-        #valList { flex: 1; overflow-y: auto; padding: 10px; font-size: 13px; line-height: 1.6; }
-        .missing { color: #ff4d4d; font-weight: bold; background: rgba(255, 77, 77, 0.1); padding: 2px 5px; display: block; }
-        .correct { color: #888; display: block; }
-
-        /* --- BOTONES --- */
+        /* --- HEADER COMÚN --- */
+        .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
         .btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; transition: 0.2s; font-family: 'Consolas', monospace; }
-        .btn-ind { background: #00adb5; color: white; }
-        .btn-ind:hover { background: #008a91; }
-        .btn-ini { background: #444; color: white; }
-        .btn-validate { background: #f39c12; color: black; }
-        .btn-back { background: #ff4d4d; color: white; margin-right: 15px; }
-        
+        .btn-back { background: #ff4d4d; color: white; }
+        .btn-action { background: #00adb5; color: white; }
+        .btn-secondary { background: #444; color: white; }
         .status { color: #888; font-size: 12px; margin-left: auto; }
-        .hidden { display: none !important; }
+
+        /* --- EDITOR INDEX --- */
+        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 15px; font-size: 14px; resize: none; outline: none; }
+
+        /* --- VALIDADOR DE CARPETA --- */
+        .validator-layout { flex: 1; display: flex; flex-direction: column; background: #111; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+        .report-list { flex: 1; overflow-y: auto; padding: 20px; }
+        .item-row { padding: 5px 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
+        .item-ok { color: #00ff00; opacity: 0.6; }
+        .item-missing { color: #ff0000; background: rgba(255,0,0,0.15); font-weight: bold; border-radius: 4px; }
+        .summary-bar { background: #222; padding: 15px; display: flex; gap: 30px; font-size: 1.1em; border-top: 1px solid #333; }
+        .missing-count { color: #ff4d4d; }
     </style>
 </head>
 <body>
 
-    <div id="mainMenu">
-        <div class="logo-title">AMNERYS DESARROLLO</div>
+    <div id="mainMenu" class="view active">
+        <div class="logo-title">AMNERYS SUITE</div>
         <div class="grid-buttons">
-            <div class="card" onclick="openEditor()">
-                <span>🖼️</span>
+            <div class="card" onclick="showView('editorContainer')">
+                <i>🖼️</i>
                 <h3>Editor Index AO</h3>
-                <p>Gestionar Graficos.ind / .ini</p>
+                <p>Modificar Graficos.ind y .ini</p>
             </div>
             
-            <div class="card" style="opacity: 0.5; cursor: not-allowed;">
-                <span>⚔️</span>
+            <div class="card" onclick="showView('validatorContainer')">
+                <i>📁</i>
+                <h3>Analizador de Recursos</h3>
+                <p>Detectar saltos en la numeración de imágenes</p>
+            </div>
+
+            <div class="card" style="opacity: 0.4; cursor: not-allowed;">
+                <i>⚔️</i>
                 <h3>Editor de Items</h3>
-                <p>(Próximamente)</p>
-            </div>
-            
-            <div class="card" style="opacity: 0.5; cursor: not-allowed;">
-                <span>🧙‍♂️</span>
-                <h3>Editor de NPCs</h3>
-                <p>(Próximamente)</p>
+                <p>(En desarrollo)</p>
             </div>
         </div>
     </div>
 
-    <div id="editorContainer">
+    <div id="editorContainer" class="view">
         <div class="header">
-            <button class="btn btn-back" onclick="closeEditor()">← Volver</button>
-            <strong>Editor de Gráficos</strong>
+            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
+            <strong>Indexador Graficos.ind</strong>
             <input type="file" id="loadInd" style="display:none">
-            <input type="file" id="folderInput" style="display:none" multiple accept="image/*">
-            
-            <button class="btn btn-ini" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
-            <button class="btn btn-validate" onclick="document.getElementById('folderInput').click()">📁 Validar Secuencia Gráficos</button>
-            
-            <button class="btn btn-ind" onclick="saveInd()">Descargar .IND</button>
-            <button class="btn btn-ini" onclick="saveIni()">Descargar .INI</button>
-            <div class="status" id="status">Esperando archivo...</div>
+            <button class="btn btn-secondary" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
+            <button class="btn btn-action" onclick="saveInd()">Exportar .IND</button>
+            <button class="btn btn-secondary" onclick="saveIni()">Exportar .INI</button>
+            <div class="status" id="statusEditor">Listo</div>
         </div>
+        <textarea id="editor" placeholder="Contenido de los gráficos..."></textarea>
+    </div>
 
-        <div class="editor-layout">
-            <textarea id="editor" placeholder="Pega aquí el contenido de tu .ini o carga un .ind..."></textarea>
-            
-            <div id="validatorPanel">
-                <div class="val-header">REPORTE DE SECUENCIA (IMG)</div>
-                <div id="valList">Selecciona la carpeta de imágenes para analizar faltantes...</div>
+    <div id="validatorContainer" class="view">
+        <div class="header">
+            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
+            <strong>Validador de Secuencia</strong>
+            <input type="file" id="folderInput" style="display:none" webkitdirectory directory multiple>
+            <button class="btn btn-action" onclick="document.getElementById('folderInput').click()">📁 Seleccionar Carpeta de Gráficos</button>
+            <div class="status" id="statusVal">Sin analizar</div>
+        </div>
+        
+        <div class="validator-layout">
+            <div id="reportList" class="report-list">
+                <div style="text-align: center; margin-top: 50px; color: #555;">
+                    Sube la carpeta de gráficos para verificar que no falte ningún número entre el primero y el último.
+                </div>
+            </div>
+            <div class="summary-bar" id="summaryBar">
+                <span>Total: 0</span>
+                <span class="missing-count">Faltantes: 0</span>
             </div>
         </div>
     </div>
 
 <script>
-    function openEditor() {
-        document.getElementById('mainMenu').classList.add('hidden');
-        document.getElementById('editorContainer').style.display = 'flex';
+    // --- NAVEGACIÓN ---
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
     }
 
-    function closeEditor() {
-        document.getElementById('mainMenu').classList.remove('hidden');
-        document.getElementById('editorContainer').style.display = 'none';
-    }
-
-    const editor = document.getElementById('editor');
-    const status = document.getElementById('status');
-    const valList = document.getElementById('valList');
-    let version = 447;
-
-    // --- LÓGICA DE VALIDACIÓN DE ARCHIVOS ---
+    // --- LÓGICA DEL VALIDADOR (NUEVA) ---
     document.getElementById('folderInput').onchange = (e) => {
         const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-
-        // Extraer números de los nombres (ej: "123.png" -> 123)
+        const reportList = document.getElementById('reportList');
+        const summaryBar = document.getElementById('summaryBar');
+        
+        // Filtrar archivos que empiecen con número y sean imágenes
         let numbers = files
-            .map(f => parseInt(f.name.split('.')[0]))
+            .map(f => {
+                const name = f.name.split('.')[0];
+                return parseInt(name);
+            })
             .filter(n => !isNaN(n))
             .sort((a, b) => a - b);
 
         if (numbers.length === 0) {
-            valList.innerHTML = "<span style='color:orange'>No se encontraron archivos con nombre numérico.</span>";
+            reportList.innerHTML = "<div style='color:orange; text-align:center;'>No se encontraron imágenes con nombres numéricos (ej: 1.png).</div>";
             return;
         }
 
         const min = numbers[0];
         const max = numbers[numbers.length - 1];
-        let htmlReport = "";
-        let missingCount = 0;
-
-        // Crear set para búsqueda rápida
         const numSet = new Set(numbers);
+        let html = "";
+        let missing = 0;
 
         for (let i = min; i <= max; i++) {
             if (numSet.has(i)) {
-                htmlReport += `<span class="correct">✔ Archivo ${i}</span>`;
+                html += `<div class="item-row item-ok"><span>Archivo ${i}</span><span>✔ OK</span></div>`;
             } else {
-                htmlReport += `<span class="missing">✖ FALTA: Archivo ${i}</span>`;
-                missingCount++;
+                html += `<div class="item-row item-missing"><span>ARCHIVO FALTANTE: ${i}</span><span>✖ ERROR</span></div>`;
+                missing++;
             }
         }
 
-        valList.innerHTML = htmlReport;
-        status.innerText = `Análisis: ${numbers.length} archivos. Faltan: ${missingCount}.`;
-        valList.scrollTop = 0;
+        reportList.innerHTML = html;
+        summaryBar.innerHTML = `<span>Rango: ${min} al ${max}</span> <span>Total archivos: ${numbers.length}</span> <span class="missing-count">Faltantes detectados: ${missing}</span>`;
+        document.getElementById('statusVal').innerText = "Análisis completado.";
     };
 
-    // --- LÓGICA ORIGINAL DEL EDITOR ---
+    // --- LÓGICA DEL EDITOR (CONSERVADA) ---
+    const editor = document.getElementById('editor');
+    let version = 447;
+
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        status.innerText = "Procesando binario...";
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
         let offset = 0;
-
         try {
             version = view.getInt32(offset, true); offset += 4;
             const total = view.getInt32(offset, true); offset += 4;
             let text = `[INIT]\nNumGrh=${total}\nVersion=${version}\n\n[Graphics]\n`;
-            
             while (offset < buffer.byteLength) {
                 if (offset + 4 > buffer.byteLength) break;
                 const index = view.getInt32(offset, true); offset += 4;
                 if (index <= 0) break;
                 const frames = view.getInt16(offset, true); offset += 2;
-                
                 if (frames === 1) {
                     const f = view.getInt32(offset, true); offset += 4;
                     const x = view.getInt16(offset, true); offset += 2;
@@ -180,17 +180,14 @@
                 }
             }
             editor.value = text;
-            status.innerText = `Cargados ${total} registros.`;
-        } catch(err) {
-            status.innerText = "Error en el formato binario.";
-        }
+            document.getElementById('statusEditor').innerText = `Cargado: ${total} Grhs.`;
+        } catch(e) { alert("Error cargando .IND"); }
     };
 
     function saveInd() {
         const lines = editor.value.split('\n');
         let grhs = [];
         let numGrh = 0;
-
         lines.forEach(line => {
             if (line.includes('Version=')) version = parseInt(line.split('=')[1]);
             if (line.includes('NumGrh=')) numGrh = parseInt(line.split('=')[1]);
@@ -201,19 +198,15 @@
                 grhs.push({ idx, data });
             }
         });
-
         const buffer = new ArrayBuffer(grhs.length * 80 + 100);
         const view = new DataView(buffer);
         let offset = 0;
-
         view.setInt32(offset, version, true); offset += 4;
         view.setInt32(offset, numGrh || grhs.length, true); offset += 4;
-
         grhs.forEach(g => {
             view.setInt32(offset, g.idx, true); offset += 4;
             const frames = parseInt(g.data[0]);
             view.setInt16(offset, frames, true); offset += 2;
-
             if (frames === 1) {
                 view.setInt32(offset, parseInt(g.data[1]), true); offset += 4;
                 view.setInt16(offset, parseInt(g.data[2]), true); offset += 2;
@@ -221,19 +214,15 @@
                 view.setInt16(offset, parseInt(g.data[4]), true); offset += 2;
                 view.setInt16(offset, parseInt(g.data[5]), true); offset += 2;
             } else {
-                for(let i=1; i<=frames; i++) {
-                    view.setInt32(offset, parseInt(g.data[i]), true); offset += 4;
-                }
+                for(let i=1; i<=frames; i++) { view.setInt32(offset, parseInt(g.data[i]), true); offset += 4; }
                 view.setFloat32(offset, parseFloat(g.data[frames+1]), true); offset += 4;
             }
         });
-
         view.setInt32(offset, 0, true); offset += 4;
         download(buffer.slice(0, offset), "Graficos.ind", "application/octet-stream");
     }
 
     function saveIni() { download(editor.value, "Graficos.ini", "text/plain"); }
-
     function download(content, name, type) {
         const blob = new Blob([content], { type });
         const a = document.createElement('a');
