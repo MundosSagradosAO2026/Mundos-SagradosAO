@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Fix Real-Byte</title>
+    <title>Amnerys Suite - Estructura Real</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -29,7 +29,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE PRO</div>
+        <div class="logo-title">AMNERYS SUITE v4</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -45,20 +45,20 @@
             <button class="btn" style="background:#666" onclick="saveIni()">Guardar .INI</button>
             <div id="statusInd" style="margin-left:auto">Listo</div>
         </div>
-        <textarea id="editor" spellcheck="false"></textarea>
+        <textarea id="editor" spellcheck="false" placeholder="Carga tu Graficos.ind..."></textarea>
     </div>
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor Grh.tsao (Detección de Bytes Reales)</strong>
+            <strong>Extractor Grh.tsao (Estructura Corregida)</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
                 <label>Cargar Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">INICIAR EXTRACCIÓN</button>
-                <div id="logUnpack">Esperando...</div>
+                <button class="btn" id="btnRunUnpack">EXTRAER AHORA</button>
+                <div id="logUnpack">Esperando archivo...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
         </div>
@@ -75,7 +75,7 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- LÓGICA EDITOR .IND ---
+    // --- EDITOR .IND ---
     const editorArea = document.getElementById('editor');
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
@@ -150,53 +150,44 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- UNPACKER BASADO EN BYTES REALES ---
+    // --- UNPACKER (ESTRUCTURA DE BYTES ANALIZADA) ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
-        if (!dFile) return alert("Carga Grh.tsao");
+        if (!dFile) return alert("Selecciona Grh.tsao");
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Escaneando binario...<br>";
+        gall.innerHTML = ""; log.innerHTML = "Analizando...<br>";
 
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
 
-        // Detectar cabecera real
-        // Byte 0-3: lngFileSize (ofuscado)
-        // Byte 4-5: intNumFiles
+        // Estructura Cabecera Real detectada en tus bytes:
+        // Byte 4-5 es el número de archivos
         const numFiles = dView.getInt16(4, true);
-        log.innerHTML += `Archivos declarados: ${numFiles}<br>`;
+        log.innerHTML += `Archivos: ${numFiles}<br>`;
 
-        // En tus bytes reales, el primer nombre "1.png" aparece en el offset 14.
-        // Esto significa que el INFOHEADER empieza en el byte 6.
-        let offset = 6; 
-        const infoSize = 48; 
+        let offset = 6; // Inicio de INFOHEADER
+        const recordSize = 48;
         let count = 0;
 
         for (let i = 0; i < numFiles; i++) {
-            if (offset + infoSize > dBuf.byteLength) break;
+            if (offset + recordSize > dBuf.byteLength) break;
 
-            // ANALISIS DE BYTES REALES SEGUN SNIPPET:
-            // [offset + 0...7] -> Datos de posición/tamaño
-            // [offset + 8...39] -> El nombre del archivo (aquí está "1.png")
-            
-            const startPos = dView.getUint32(offset, true);
-            const size = dView.getUint32(offset + 4, true);
-            
-            let nameBytes = new Uint8Array(dBuf, offset + 8, 32);
+            // LECTURA SEGUN BYTES REALES DEL ARCHIVO:
+            // [0-3] Tamaño comprimido
+            // [4-7] Puntero de inicio (StartPos)
+            // [8-11] Tamaño descomprimido
+            // [12-43] Nombre (1.png, etc)
+
+            const compressedSize = dView.getUint32(offset, true);
+            const startPos = dView.getUint32(offset + 4, true);
+            const nameBytes = new Uint8Array(dBuf, offset + 12, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
 
-            // Si el nombre no parece válido, buscamos en el bloque
-            if (!fName.includes('.png')) {
-                // Intento de rescate: a veces el nombre está desplazado
-                nameBytes = new Uint8Array(dBuf, offset + 12, 32);
-                fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
-            }
-
-            if (fName.includes('.png') && size > 0 && startPos + size <= dBytes.length) {
+            if (fName.includes('.png') && compressedSize > 0 && startPos + compressedSize <= dBytes.length) {
                 try {
-                    const chunk = dBytes.slice(startPos, startPos + size);
+                    const chunk = dBytes.slice(startPos, startPos + compressedSize);
                     const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
                     
@@ -208,14 +199,14 @@
                 } catch (e) { }
             }
 
-            offset += infoSize;
+            offset += recordSize;
 
             if (i % 100 === 0) {
-                log.innerHTML = `Leído: ${i} / ${numFiles} (Extraídos: ${count})`;
+                log.innerHTML = `Progreso: ${i} / ${numFiles} (Extraídos: ${count})`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = `<strong>Finalizado: ${count} imágenes recuperadas.</strong>`;
+        log.innerHTML = `<strong>Finalizado: ${count} imágenes extraídas.</strong>`;
     };
 </script>
 </body>
