@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSao GOD MODE</title>
+<title>Extractor TSao FULL FINAL</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 
@@ -16,7 +16,7 @@ img{width:100px;border:1px solid #333;}
 
 <body>
 
-<h2>Extractor TSao GOD MODE</h2>
+<h2>Extractor TSao FULL FINAL</h2>
 
 <input type="file" id="fileInput"><br><br>
 <button onclick="start()">EXTRAER</button>
@@ -43,31 +43,48 @@ function readString(bytes, offset, len){
     return s.trim();
 }
 
-// 🔍 buscar firmas
+// 🔍 buscar firmas reales
 function findCandidates(data){
     let offsets = [];
+
     for(let i=0;i<data.length-4;i++){
-        if(data[i]===0x89 && data[i+1]===0x50) offsets.push(i);
+
+        // PNG
+        if(data[i]===0x89 && data[i+1]===0x50 && data[i+2]===0x4E) offsets.push(i);
+
+        // JPG
+        if(data[i]===0xFF && data[i+1]===0xD8) offsets.push(i);
+
+        // BMP
+        if(data[i]===0x42 && data[i+1]===0x4D) offsets.push(i);
+
+        // ZLIB
         if(data[i]===0x78 && (data[i+1]===0x9C || data[i+1]===0xDA)) offsets.push(i);
+
+        // posibles deflate
         if(data[i]===0x63 || data[i]===0xED) offsets.push(i);
     }
+
     return offsets;
 }
 
-// 🧠 construir PNG fake
+function tryInflate(data){
+    try{ return pako.inflateRaw(data); }catch{}
+    try{ return pako.inflate(data); }catch{}
+    return null;
+}
+
+// 🧠 crear PNG falso
 function buildPNG(raw){
 
     function chunk(type, data){
         let len = data.length;
         let out = new Uint8Array(12 + len);
-
         let dv = new DataView(out.buffer);
-        dv.setUint32(0, len);
 
+        dv.setUint32(0, len);
         out.set(type,4);
         out.set(data,8);
-
-        // CRC fake (no siempre necesario)
         dv.setUint32(8+len, 0);
 
         return out;
@@ -75,7 +92,6 @@ function buildPNG(raw){
 
     let header = new Uint8Array([137,80,78,71,13,10,26,10]);
 
-    // IHDR fake (32x32)
     let ihdr = new Uint8Array(13);
     let dv = new DataView(ihdr.buffer);
     dv.setUint32(0,32);
@@ -84,26 +100,16 @@ function buildPNG(raw){
     ihdr[9]=6;
 
     let png = new Uint8Array(
-        header.length +
-        12+13 +
-        12+raw.length +
-        12
+        header.length + 25 + (12+raw.length) + 12
     );
 
     let offset=0;
-
     png.set(header,offset); offset+=header.length;
     png.set(chunk(new TextEncoder().encode("IHDR"), ihdr),offset); offset+=25;
     png.set(chunk(new TextEncoder().encode("IDAT"), raw),offset); offset+=12+raw.length;
     png.set(chunk(new TextEncoder().encode("IEND"), new Uint8Array(0)),offset);
 
     return png;
-}
-
-function tryInflate(data){
-    try{ return pako.inflateRaw(data); }catch{}
-    try{ return pako.inflate(data); }catch{}
-    return null;
 }
 
 async function start(){
@@ -148,20 +154,35 @@ async function start(){
 
         try{
 
-            // 💥 EXTENSIÓN (clave)
             let raw = bytes.slice(f.start, f.start + f.size + 800);
 
             let candidates = findCandidates(raw);
 
             let out = null;
+            let mime = "image/png";
 
             for(let c of candidates){
 
                 let slice = raw.slice(c);
 
-                // PNG directo
+                // PNG
                 if(slice[0]===0x89 && slice[1]===0x50){
                     out = slice;
+                    mime="image/png";
+                    break;
+                }
+
+                // JPG
+                if(slice[0]===0xFF && slice[1]===0xD8){
+                    out = slice;
+                    mime="image/jpeg";
+                    break;
+                }
+
+                // BMP
+                if(slice[0]===0x42 && slice[1]===0x4D){
+                    out = slice;
+                    mime="image/bmp";
                     break;
                 }
 
@@ -169,12 +190,12 @@ async function start(){
 
                 if(infl){
 
-                    // si ya es PNG
-                    if(infl[0]===0x89 && infl[1]===0x50){
+                    if(infl[0]===0x89){
                         out = infl;
+                        mime="image/png";
                     }else{
-                        // 🔥 construir PNG fake
                         out = buildPNG(infl);
+                        mime="image/png";
                     }
 
                     break;
@@ -183,7 +204,7 @@ async function start(){
 
             if(!out) throw "fail";
 
-            let blob = new Blob([out], {type:"image/png"});
+            let blob = new Blob([out], {type:mime});
             let img = document.createElement("img");
 
             img.src = URL.createObjectURL(blob);
@@ -194,9 +215,50 @@ async function start(){
             ok++;
 
         }catch{
-            fail++;
-            if(fail < 20){
-                log("Error en " + f.name);
+
+            try{
+
+                let raw = bytes.slice(f.start, f.start + f.size);
+
+                let sizes = [32,64,96,128];
+
+                for(let s of sizes){
+
+                    let needed = s*s*4;
+
+                    if(raw.length >= needed){
+
+                        let canvas = document.createElement("canvas");
+                        canvas.width = s;
+                        canvas.height = s;
+
+                        let ctx = canvas.getContext("2d");
+                        let imgData = ctx.createImageData(s,s);
+
+                        imgData.data.set(raw.slice(0,needed));
+                        ctx.putImageData(imgData,0,0);
+
+                        let img = document.createElement("img");
+                        img.src = canvas.toDataURL();
+                        img.title = f.name + " RAW";
+
+                        imgDiv.appendChild(img);
+
+                        ok++;
+                        throw "recovered";
+                    }
+                }
+
+                fail++;
+
+            }catch(e){
+
+                if(e !== "recovered"){
+                    fail++;
+                    if(fail < 20){
+                        log("Error en " + f.name);
+                    }
+                }
             }
         }
 
