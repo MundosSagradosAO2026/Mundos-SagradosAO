@@ -2,152 +2,115 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Graphics Tools - IND/INI Converter</title>
+    <title>Amnerys Indexer PRO - Fixed</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; margin: 20px; text-align: center; }
-        .container { max-width: 800px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; border: 1px solid #333; }
-        h1 { color: #00adb5; margin-bottom: 5px; }
-        p { color: #888; margin-bottom: 25px; }
-        .box { border: 2px dashed #444; padding: 30px; margin: 15px 0; border-radius: 8px; transition: 0.3s; cursor: pointer; }
+        .container { max-width: 850px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; border: 1px solid #333; }
+        h1 { color: #00adb5; }
+        .box { border: 2px dashed #444; padding: 30px; margin: 15px 0; border-radius: 8px; cursor: pointer; }
         .box:hover { border-color: #00adb5; background: #252525; }
-        .btn { background: #00adb5; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px; }
-        .btn:disabled { background: #444; cursor: not-allowed; }
-        #status { margin-top: 20px; padding: 15px; border-radius: 5px; background: #000; font-family: monospace; font-size: 13px; text-align: left; max-height: 200px; overflow-y: auto; color: #0f0; }
+        .btn { background: #00adb5; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 5px; background: #000; font-family: monospace; font-size: 12px; text-align: left; max-height: 250px; overflow-y: auto; color: #0f0; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Amnerys Indexer PRO</h1>
-    <p>Conversor de Gráficos (IND <-> INI) para Argentum Online</p>
+    <h1>Amnerys Graphics Tools</h1>
+    <p>Si el error persiste, es probable que tu .ind use Integers (2 bytes) en lugar de Longs.</p>
 
     <div class="box" onclick="document.getElementById('indInput').click()">
-        <strong>Convertir .IND a .INI</strong><br>
-        <small>(Para leer el archivo binario original)</small>
+        <strong>Cargar Graficos.ind</strong>
         <input type="file" id="indInput" hidden accept=".ind">
     </div>
 
-    <div class="box" onclick="document.getElementById('iniInput').click()">
-        <strong>Convertir .INI a .IND</strong><br>
-        <small>(Para guardar tus cambios y que el juego los lea)</small>
-        <input type="file" id="iniInput" hidden accept=".ini">
-    </div>
-
-    <div id="status">Esperando archivos...</div>
-    
-    <div id="actions" style="margin-top:20px;"></div>
+    <div id="status">Consola lista.</div>
+    <div id="actions"></div>
 </div>
 
 <script>
     const status = document.getElementById('status');
     const actions = document.getElementById('actions');
 
-    function log(msg) {
-        status.innerHTML += `> ${msg}<br>`;
+    function log(msg, error = false) {
+        const color = error ? "#ff4d4d" : "#0f0";
+        status.innerHTML += `> <span style="color:${color}">${msg}</span><br>`;
         status.scrollTop = status.scrollHeight;
     }
 
-    // --- LECTURA: IND -> INI ---
     document.getElementById('indInput').onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        log(`Analizando ${file.name}...`);
+        
+        status.innerHTML = "";
+        log(`Iniciando lectura de ${file.name}...`);
         
         const buffer = await file.arrayBuffer();
         const view = new DataView(buffer);
         let offset = 0;
 
-        const version = view.getInt32(offset, true); offset += 4;
-        const grhCount = view.getInt32(offset, true); offset += 4;
-        
-        let ini = `[INIT]\nNumGrh=${grhCount}\nVersion=${version}\n\n[Graphics]\n`;
-        let count = 0;
-
         try {
+            // Intentar leer cabecera estándar (4+4 bytes)
+            // Algunos .ind usan Integer (2 bytes) para el total de Grhs.
+            const version = view.getInt32(offset, true); offset += 4;
+            const grhCount = view.getInt32(offset, true); offset += 4;
+            
+            log(`Versión detectada: ${version}`);
+            log(`Total Grhs declarado: ${grhCount}`);
+
+            let ini = `[INIT]\nNumGrh=${grhCount}\nVersion=${version}\n\n[Graphics]\n`;
+            let count = 0;
+
+            // Saltamos el primer puntero si existe (4 bytes adicionales en algunas versiones)
+            // offset += 4; 
+
             while (offset < buffer.byteLength) {
+                if (offset + 4 > buffer.byteLength) break;
+                
                 const grhIndex = view.getInt32(offset, true); offset += 4;
                 if (grhIndex <= 0) break;
 
-                const numFrames = view.getInt32(offset, true); offset += 4;
+                const numFrames = view.getInt16(offset, true); offset += 2; // USAMOS INT16 (2 bytes)
 
                 if (numFrames === 1) {
-                    const f = [view.getInt32(offset, true), view.getInt32(offset+4, true), view.getInt32(offset+8, true), view.getInt32(offset+12, true), view.getInt32(offset+16, true)];
-                    offset += 20;
-                    ini += `Grh${grhIndex}=1-${f[0]}-${f[1]}-${f[2]}-${f[3]}-${f[4]}\n`;
+                    // Gráfico simple: File(4), X(2), Y(2), W(2), H(2) -> Total 12 bytes
+                    // NOTA: Si tu motor es puramente 32 bits, cambia los getInt16 por getInt32
+                    const fileNum = view.getInt32(offset, true); offset += 4;
+                    const sX = view.getInt16(offset, true); offset += 2;
+                    const sY = view.getInt16(offset, true); offset += 2;
+                    const width = view.getInt16(offset, true); offset += 2;
+                    const height = view.getInt16(offset, true); offset += 2;
+
+                    ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
                 } else {
+                    // Animación
                     let frames = [];
-                    for(let i=0; i<numFrames; i++) { frames.push(view.getInt32(offset, true)); offset += 4; }
-                    const speed = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, ""); offset += 4;
+                    for(let i=0; i < numFrames; i++) {
+                        frames.push(view.getInt32(offset, true)); 
+                        offset += 4;
+                    }
+                    const speed = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, "");
+                    offset += 4;
                     ini += `Grh${grhIndex}=${numFrames}-${frames.join('-')}-${speed}\n`;
                 }
                 count++;
+                
+                if(count > 50000) { // Safety break
+                    log("Error: Bucle infinito detectado (formato de bytes incorrecto)", true);
+                    break;
+                }
             }
-            createDownloadBtn("Descargar Graficos.ini", ini, "text/plain", "Graficos.ini");
-            log(`Éxito: ${count} Grhs procesados.`);
-        } catch(err) { log("Error procesando archivo binario."); }
-    };
 
-    // --- ESCRITURA: INI -> IND ---
-    document.getElementById('iniInput').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const text = await file.text();
-        log("Compilando INI a binario...");
-
-        const lines = text.split(/\r?\n/);
-        let version = 0, numGrh = 0, graphics = [];
-
-        lines.forEach(line => {
-            if (line.includes('Version=')) version = parseInt(line.split('=')[1]);
-            if (line.includes('NumGrh=')) numGrh = parseInt(line.split('=')[1]);
-            if (line.startsWith('Grh')) {
-                const parts = line.split('=');
-                const index = parseInt(parts[0].replace('Grh', ''));
-                const data = parts[1].split('-');
-                graphics.push({ index, data });
-            }
-        });
-
-        // Cálculo estimado de tamaño de buffer
-        let bufferSize = 8 + (graphics.length * 50); 
-        let ab = new ArrayBuffer(bufferSize);
-        let dv = new DataView(ab);
-        let offset = 0;
-
-        dv.setInt32(offset, version, true); offset += 4;
-        dv.setInt32(offset, numGrh, true); offset += 4;
-
-        graphics.sort((a,b) => a.index - b.index).forEach(g => {
-            dv.setInt32(offset, g.index, true); offset += 4;
-            const numFrames = parseInt(g.data[0]);
-            dv.setInt32(offset, numFrames, true); offset += 4;
-
-            if (numFrames === 1) {
-                for(let i=1; i<=5; i++) { dv.setInt32(offset, parseInt(g.data[i]), true); offset += 4; }
-            } else {
-                for(let i=1; i<=numFrames; i++) { dv.setInt32(offset, parseInt(g.data[i]), true); offset += 4; }
-                dv.setFloat32(offset, parseFloat(g.data[numFrames+1]), true); offset += 4;
-            }
-        });
-
-        dv.setInt32(offset, 0, true); offset += 4; // Fin de archivo
-        createDownloadBtn("Descargar Graficos.ind", ab.slice(0, offset), "application/octet-stream", "Graficos.ind");
-        log(`IND generado con ${graphics.length} registros.`);
-    };
-
-    function createDownloadBtn(label, content, type, filename) {
-        actions.innerHTML = "";
-        const btn = document.createElement("button");
-        btn.className = "btn";
-        btn.innerText = label;
-        btn.onclick = () => {
-            const blob = new Blob([content], { type });
+            log(`Éxito: ${count} registros procesados.`);
+            const blob = new Blob([ini], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url; a.download = filename; a.click();
-        };
-        actions.appendChild(btn);
-    }
+            actions.innerHTML = `<button class="btn" onclick="window.location.href='${url}'" download="Graficos.ini">Descargar Graficos.ini</button>`;
+
+        } catch(err) {
+            log(`ERROR DE LECTURA: El formato binario no coincide con la estructura esperada.`, true);
+            log(`Detalle: ${err.message}`, true);
+        }
+    };
 </script>
 </body>
 </html>
