@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite - Editor & Unpacker Final</title>
+    <title>Amnerys Suite - Fix Real-Byte</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
         #mainMenu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
-        .logo-title { font-size: 2.5em; text-shadow: 0 0 15px #00ff00; color: #fff; }
+        .logo-title { font-size: 2.2em; text-shadow: 0 0 15px #00ff00; color: #fff; }
         .grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; max-width: 600px; }
         .card { background: #1e1e1e; border: 2px solid #333; padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; }
         .card:hover { border-color: #00adb5; background: #252525; }
@@ -29,7 +29,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE</div>
+        <div class="logo-title">AMNERYS SUITE PRO</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -42,23 +42,23 @@
             <input type="file" id="loadInd" style="display:none">
             <button class="btn" onclick="document.getElementById('loadInd').click()">Abrir .IND</button>
             <button class="btn btn-save" onclick="saveInd()">Guardar .IND</button>
-            <button class="btn" style="background:#666" onclick="saveIni()">Descargar .INI</button>
+            <button class="btn" style="background:#666" onclick="saveIni()">Guardar .INI</button>
             <div id="statusInd" style="margin-left:auto">Listo</div>
         </div>
-        <textarea id="editor" spellcheck="false" placeholder="Carga un archivo .ind..."></textarea>
+        <textarea id="editor" spellcheck="false"></textarea>
     </div>
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
             <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extracción Grh.tsao (Estructura de 48 bytes)</strong>
+            <strong>Extractor Grh.tsao (Detección de Bytes Reales)</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
                 <label>Cargar Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">EXTRAER IMÁGENES</button>
-                <div id="logUnpack">Esperando archivo...</div>
+                <button class="btn" id="btnRunUnpack">INICIAR EXTRACCIÓN</button>
+                <div id="logUnpack">Esperando...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
         </div>
@@ -75,7 +75,7 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- LÓGICA EDITOR .IND (IDÉNTICA A LA TUYA) ---
+    // --- LÓGICA EDITOR .IND ---
     const editorArea = document.getElementById('editor');
     document.getElementById('loadInd').onchange = async (e) => {
         const file = e.target.files[0]; if (!file) return;
@@ -150,49 +150,53 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
     }
 
-    // --- LÓGICA UNPACKER (SEGÚN TU ANÁLISIS) ---
+    // --- UNPACKER BASADO EN BYTES REALES ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
         if (!dFile) return alert("Carga Grh.tsao");
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Analizando Grh.tsao...<br>";
+        gall.innerHTML = ""; log.innerHTML = "Escaneando binario...<br>";
 
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
 
-        // PasswordPak constante mágica de tu análisis
-        const PasswordPak = 435098;
-        const ofuscatedSize = dView.getInt32(0, true);
-        const realSize = ofuscatedSize - PasswordPak;
+        // Detectar cabecera real
+        // Byte 0-3: lngFileSize (ofuscado)
+        // Byte 4-5: intNumFiles
         const numFiles = dView.getInt16(4, true);
+        log.innerHTML += `Archivos declarados: ${numFiles}<br>`;
 
-        log.innerHTML += `Archivos: ${numFiles}<br>Tamaño Real: ${realSize}<br>`;
-
-        let offset = 6; // Saltar FILEHEADER (6 bytes)
-        const infoHeaderSize = 48; // Según tu análisis
+        // En tus bytes reales, el primer nombre "1.png" aparece en el offset 14.
+        // Esto significa que el INFOHEADER empieza en el byte 6.
+        let offset = 6; 
+        const infoSize = 48; 
+        let count = 0;
 
         for (let i = 0; i < numFiles; i++) {
-            if (offset + infoHeaderSize > dBuf.byteLength) break;
+            if (offset + infoSize > dBuf.byteLength) break;
 
-            // Según tu INFOHEADER:
-            // [0-3] lngFileStart (Long)
-            // [4-7] lngFileSize (Long)
-            // [8-39] strFileName (String*32)
-            // [40-43] lngFileSizeUncompressed (Long)
+            // ANALISIS DE BYTES REALES SEGUN SNIPPET:
+            // [offset + 0...7] -> Datos de posición/tamaño
+            // [offset + 8...39] -> El nombre del archivo (aquí está "1.png")
             
             const startPos = dView.getUint32(offset, true);
             const size = dView.getUint32(offset + 4, true);
+            
             let nameBytes = new Uint8Array(dBuf, offset + 8, 32);
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
-            
-            offset += infoHeaderSize;
 
-            if (size > 0 && startPos + size <= dBytes.length) {
+            // Si el nombre no parece válido, buscamos en el bloque
+            if (!fName.includes('.png')) {
+                // Intento de rescate: a veces el nombre está desplazado
+                nameBytes = new Uint8Array(dBuf, offset + 12, 32);
+                fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
+            }
+
+            if (fName.includes('.png') && size > 0 && startPos + size <= dBytes.length) {
                 try {
-                    let chunk = dBytes.slice(startPos, startPos + size);
-                    // Descomprimir con Zlib (Pako)
+                    const chunk = dBytes.slice(startPos, startPos + size);
                     const unzipped = pako.inflate(chunk);
                     const url = URL.createObjectURL(new Blob([unzipped], {type:'image/png'}));
                     
@@ -200,16 +204,18 @@
                     div.className = 'img-card';
                     div.innerHTML = `<img src="${url}"><br>${fName}`;
                     gall.appendChild(div);
-                } catch (e) {
-                    // console.log("Error descomprimiendo " + fName);
-                }
+                    count++;
+                } catch (e) { }
             }
-            if (i % 50 === 0) {
-                log.innerHTML = `Extrayendo: ${i} / ${numFiles}...`;
+
+            offset += infoSize;
+
+            if (i % 100 === 0) {
+                log.innerHTML = `Leído: ${i} / ${numFiles} (Extraídos: ${count})`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = "<strong>Finalizado.</strong>";
+        log.innerHTML = `<strong>Finalizado: ${count} imágenes recuperadas.</strong>`;
     };
 </script>
 </body>
