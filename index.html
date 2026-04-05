@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Amnerys Suite v9 - Entropy 8.0 Fix</title>
+    <title>Amnerys Suite v10 - Direct Offset Mode</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <style>
         body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -20,8 +20,6 @@
         .img-card { background: #111; border: 1px solid #444; padding: 5px; text-align: center; font-size: 10px; color: #eee; }
         .img-card img { max-width: 100%; height: auto; image-rendering: pixelated; background: #222; }
         .btn { padding: 8px 15px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; background: #00adb5; color: white; }
-        .btn-save { background: #28a745; }
-        .btn-back { background: #ff4d4d; }
         #logUnpack { background:#000; padding:10px; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; color:#0f0; }
         .hidden { display: none !important; }
     </style>
@@ -29,7 +27,7 @@
 <body>
 
     <div id="mainMenu">
-        <div class="logo-title">AMNERYS SUITE v9</div>
+        <div class="logo-title">AMNERYS SUITE v10</div>
         <div class="grid-buttons">
             <div class="card" onclick="showView('editorContainer')"><h3>Editor .IND</h3></div>
             <div class="card" onclick="showView('unpackerContainer')"><h3>Unpacker .TSAO</h3></div>
@@ -38,11 +36,9 @@
 
     <div id="editorContainer" class="view-container">
         <div class="header">
-            <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
+            <button class="btn" onclick="showView('mainMenu')">Volver</button>
             <input type="file" id="loadInd" style="display:none">
             <button class="btn" onclick="document.getElementById('loadInd').click()">Abrir .IND</button>
-            <button class="btn btn-save" onclick="saveInd()">Guardar .IND</button>
-            <button class="btn" style="background:#666" onclick="saveIni()">Guardar .INI</button>
             <div id="statusInd" style="margin-left:auto">Listo</div>
         </div>
         <textarea id="editor" spellcheck="false"></textarea>
@@ -50,15 +46,15 @@
 
     <div id="unpackerContainer" class="view-container">
         <div class="header">
-            <button class="btn btn-back" onclick="showView('mainMenu')">Volver</button>
-            <strong>Extractor de Alta Entropía (Zlib/Pako Stream)</strong>
+            <button class="btn" onclick="showView('mainMenu')">Volver</button>
+            <strong>Extractor por Offset Directo</strong>
         </div>
         <div class="unpacker-layout">
             <div class="side-panel">
                 <label>Archivo Grh.tsao:</label>
                 <input type="file" id="fileData">
-                <button class="btn" id="btnRunUnpack">DESCOMPRIMIR Y EXTRAER</button>
-                <div id="logUnpack">Detección de entropía: 8.00<br>Esperando...</div>
+                <button class="btn" id="btnRunUnpack">EXTRAER GRÁFICOS</button>
+                <div id="logUnpack">Listo para procesar...</div>
             </div>
             <div class="gallery" id="galleryBox"></div>
         </div>
@@ -73,120 +69,43 @@
         else document.getElementById(id).style.display = 'flex';
     }
 
-    // --- EDITOR .IND (IDÉNTICO AL ANTERIOR) ---
-    let currentVersion = 0;
-    const editorArea = document.getElementById('editor');
-    document.getElementById('loadInd').onchange = async (e) => {
-        const file = e.target.files[0]; if (!file) return;
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        let offset = 0;
-        currentVersion = view.getInt32(offset, true); offset += 4;
-        const total = view.getInt32(offset, true); offset += 4;
-        let text = `[INIT]\nNumGrh=${total}\nVersion=${currentVersion}\n\n[Graphics]\n`;
-        while (offset < buffer.byteLength) {
-            if (offset + 4 > buffer.byteLength) break;
-            const index = view.getInt32(offset, true); offset += 4;
-            if (index <= 0) break;
-            const frames = view.getInt16(offset, true); offset += 2;
-            if (frames === 1) {
-                const f = view.getInt32(offset, true); offset += 4;
-                const x = view.getInt16(offset, true); offset += 2;
-                const y = view.getInt16(offset, true); offset += 2;
-                const w = view.getInt16(offset, true); offset += 2;
-                const h = view.getInt16(offset, true); offset += 2;
-                text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
-            } else {
-                let ids = [];
-                for(let i=0; i<frames; i++) { ids.push(view.getInt32(offset, true)); offset += 4; }
-                const spd = view.getFloat32(offset, true).toFixed(3).replace(/\.?0+$/, ""); offset += 4;
-                text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
-            }
-        }
-        editorArea.value = text;
-    };
-
-    function saveInd() {
-        const lines = editorArea.value.split('\n');
-        let grhs = []; let totalGrh = 0;
-        lines.forEach(line => {
-            if (line.startsWith('NumGrh=')) totalGrh = parseInt(line.split('=')[1]);
-            if (line.startsWith('Grh')) {
-                const parts = line.split('=');
-                const idx = parseInt(parts[0].replace('Grh', ''));
-                const data = parts[1].split('-');
-                grhs.push({ idx, data });
-            }
-        });
-        const buffer = new ArrayBuffer(grhs.length * 90 + 100);
-        const view = new DataView(buffer);
-        let offset = 0;
-        view.setInt32(offset, currentVersion, true); offset += 4;
-        view.setInt32(offset, totalGrh || grhs.length, true); offset += 4;
-        grhs.forEach(g => {
-            view.setInt32(offset, g.idx, true); offset += 4;
-            const frames = parseInt(g.data[0]);
-            view.setInt16(offset, frames, true); offset += 2;
-            if (frames === 1) {
-                view.setInt32(offset, parseInt(g.data[1]), true); offset += 4;
-                view.setInt16(offset, parseInt(g.data[2]), true); offset += 2;
-                view.setInt16(offset, parseInt(g.data[3]), true); offset += 2;
-                view.setInt16(offset, parseInt(g.data[4]), true); offset += 2;
-                view.setInt16(offset, parseInt(g.data[5]), true); offset += 2;
-            } else {
-                for(let i=1; i<=frames; i++) { view.setInt32(offset, parseInt(g.data[i]), true); offset += 4; }
-                view.setFloat32(offset, parseFloat(g.data[frames+1]), true); offset += 4;
-            }
-        });
-        downloadBlob(buffer.slice(0, offset), "Graficos.ind");
-    }
-    function saveIni() { downloadBlob(editorArea.value, "Graficos.ini"); }
-    function downloadBlob(content, name) {
-        const blob = new Blob([content], { type: "application/octet-stream" });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
-    }
-
-    // --- UNPACKER v9 (FLUJO DE DESCOMPRESIÓN SUMADA) ---
+    // --- LÓGICA DE EXTRACCIÓN v10 ---
     document.getElementById('btnRunUnpack').onclick = async () => {
         const dFile = document.getElementById('fileData').files[0];
-        if (!dFile) return alert("Carga el Grh.tsao");
+        if (!dFile) return alert("Carga el archivo .tsao");
+        
         const log = document.getElementById('logUnpack');
         const gall = document.getElementById('galleryBox');
-        gall.innerHTML = ""; log.innerHTML = "Calculando offsets en datos de alta entropía...<br>";
-
+        gall.innerHTML = "";
+        
         const dBuf = await dFile.arrayBuffer();
         const dView = new DataView(dBuf);
         const dBytes = new Uint8Array(dBuf);
 
-        // Cabecera: los primeros 2 bytes son basura o versión, los siguientes 2 son NumFiles
-        const numFiles = dView.getUint16(2, true); 
-        log.innerHTML += `Archivos en tabla: ${numFiles}<br>`;
+        // Según el hex, el número de archivos está en el byte 2
+        const numFiles = dView.getUint16(2, true);
+        log.innerHTML = `Archivos detectados: ${numFiles}<br>`;
 
         let offset = 6;
-        const recordSize = 40; // Estructura confirmada por tu volcado hexadecimal
-        
-        // El área de datos empieza después de todos los registros de nombres
-        let currentDataOffset = offset + (numFiles * recordSize);
+        const recordSize = 40;
         let count = 0;
 
         for (let i = 0; i < numFiles; i++) {
             if (offset + recordSize > dBuf.byteLength) break;
 
-            const compSize = dView.getUint32(offset, true);
-            const uncompSize = dView.getUint32(offset + 4, true);
+            // LEER ESTRUCTURA SEGÚN HEXADECIMAL DE 40 BYTES
+            const absoluteOffset = dView.getUint32(offset + 4, true); // Bytes 4-7
+            const compressedSize = dView.getUint32(offset + 8, true); // Bytes 8-11
             
-            const nameBytes = new Uint8Array(dBuf, offset + 8, 32);
+            const nameBytes = new Uint8Array(dBuf, offset + 12, 28); // Bytes 12-39
             let fName = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
 
-            if (compSize > 0 && (currentDataOffset + compSize) <= dBytes.length) {
+            if (compressedSize > 0 && absoluteOffset + compressedSize <= dBytes.length) {
                 try {
-                    // Extraemos el pedazo comprimido
-                    const compressedChunk = dBytes.slice(currentDataOffset, currentDataOffset + compSize);
+                    const chunk = dBytes.slice(absoluteOffset, absoluteOffset + compressedSize);
                     
-                    // Intentamos inflar con pako
-                    const decompressed = pako.inflate(compressedChunk);
-                    
-                    // Creamos la imagen
+                    // Si la entropía es 8, los datos están comprimidos con Zlib
+                    const decompressed = pako.inflate(chunk);
                     const blob = new Blob([decompressed], { type: 'image/png' });
                     const url = URL.createObjectURL(blob);
                     
@@ -196,20 +115,26 @@
                     gall.appendChild(div);
                     count++;
                 } catch (e) {
-                    // Si falla pako, es que el dato no es zlib puro o tiene una cabecera extra
+                    // Si pako falla, intentamos ver si es un PNG plano
+                    if (dBytes[absoluteOffset] === 0x89 && dBytes[absoluteOffset+1] === 0x50) {
+                        const blob = new Blob([dBytes.slice(absoluteOffset, absoluteOffset + compressedSize)], { type: 'image/png' });
+                        const url = URL.createObjectURL(blob);
+                        const div = document.createElement('div');
+                        div.className = 'img-card';
+                        div.innerHTML = `<img src="${url}"><br>${fName}`;
+                        gall.appendChild(div);
+                        count++;
+                    }
                 }
-                // AVANZAMOS siempre el puntero, falle o no la descompresión
-                currentDataOffset += compSize;
             }
 
             offset += recordSize;
-
-            if (i % 100 === 0) {
-                log.innerHTML = `Analizando: ${i}/${numFiles} (Éxitos: ${count})`;
+            if (i % 200 === 0) {
+                log.innerHTML = `Extrayendo: ${i}/${numFiles}...`;
                 await new Promise(r => setTimeout(r, 1));
             }
         }
-        log.innerHTML = `<strong>Finalizado: ${count} imágenes recuperadas de los datos comprimidos.</strong>`;
+        log.innerHTML = `<strong>¡Éxito! ${count} imágenes recuperadas.</strong>`;
     };
 </script>
 </body>
