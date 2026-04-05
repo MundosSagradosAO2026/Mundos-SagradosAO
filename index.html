@@ -1,198 +1,183 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Editor Graficos.ind PRO</title>
-
-<style>
-body{
-    background:#0b0b0b;
-    color:#FFD700;
-    font-family: monospace;
-    text-align:center;
-    padding:40px;
-}
-.box{
-    border:1px solid #FFD700;
-    padding:20px;
-    max-width:800px;
-    margin:auto;
-    background:#111;
-}
-button{
-    background:#FFD700;
-    border:none;
-    padding:10px 20px;
-    margin:10px;
-    cursor:pointer;
-    font-weight:bold;
-}
-pre{
-    text-align:left;
-    background:#000;
-    padding:10px;
-    height:300px;
-    overflow:auto;
-    color:#0f0;
-}
-.progress{
-    width:100%;
-    background:#222;
-    height:20px;
-    margin-top:15px;
-    border:1px solid #FFD700;
-}
-.bar{
-    height:100%;
-    width:0%;
-    background:#FFD700;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Editor Graficos.ind - Estilo Retro</title>
+    <style>
+        body {
+            background: #0b0b0b;
+            color: #FFD700;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            padding: 40px;
+        }
+        .box {
+            border: 2px solid #FFD700;
+            padding: 20px;
+            max-width: 850px;
+            margin: auto;
+            background: #111;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+        }
+        h2 { text-transform: uppercase; letter-spacing: 2px; }
+        .controls { margin-bottom: 20px; }
+        input[type="file"] {
+            background: #222;
+            color: #FFD700;
+            padding: 10px;
+            border: 1px dashed #FFD700;
+            margin-bottom: 10px;
+        }
+        button {
+            background: #FFD700;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            margin: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #fff;
+            box-shadow: 0 0 10px #FFD700;
+        }
+        pre {
+            text-align: left;
+            background: #000;
+            padding: 15px;
+            height: 400px;
+            overflow: auto;
+            color: #0f0;
+            border: 1px solid #333;
+            font-size: 13px;
+        }
+        #info {
+            font-weight: bold;
+            margin: 15px 0;
+            color: #fff;
+        }
+    </style>
 </head>
-
 <body>
 
 <div class="box">
-    <h2>📦 Lector Graficos.ind PRO</h2>
+    <h2>⚔️ Decodificador de Graficos.ind</h2>
+    <p>Convierte archivos binarios de Argentum Online a formato .ini</p>
 
-    <input type="file" id="fileInput"><br>
-
-    <button onclick="procesar()">Leer Archivo</button>
-    <button onclick="descargar()">Descargar .ini</button>
-
-    <div class="progress">
-        <div class="bar" id="bar"></div>
+    <div class="controls">
+        <input type="file" id="fileInput" accept=".ind"><br>
+        <button onclick="procesar()">Leer y Analizar</button>
+        <button onclick="descargar()">Descargar Graficos.ini</button>
     </div>
 
-    <p id="info"></p>
-
-    <pre id="output"></pre>
+    <p id="info">Esperando archivo...</p>
+    <pre id="output">Los datos aparecerán aquí...</pre>
 </div>
 
 <script>
 let iniTexto = "";
 
-function readLong(view, offset){
-    return view.getInt32(offset, true);
-}
+// Helpers para lectura Little-Endian
+const readLong = (view, offset) => view.getInt32(offset, true);
+const readFloat = (view, offset) => view.getFloat32(offset, true);
 
-function readFloat(view, offset){
-    return view.getFloat32(offset, true);
-}
-
-async function procesar(){
+function procesar() {
     const file = document.getElementById("fileInput").files[0];
-    if(!file){
-        alert("Subí un archivo primero");
+    if (!file) {
+        alert("Por favor, selecciona un archivo .ind");
         return;
     }
 
     const reader = new FileReader();
 
-    reader.onload = async function(e){
-
-        try{
-
+    reader.onload = function(e) {
+        try {
             const buffer = e.target.result;
             const view = new DataView(buffer);
-
             let offset = 0;
 
-            let version = readLong(view, offset); offset+=4;
-            let grhCount = readLong(view, offset); offset+=4;
-
+            // 1. Leer Cabecera
+            const fileVersion = readLong(view, offset); offset += 4;
+            const grhCount = readLong(view, offset); offset += 4;
+            // El tercer Long es el primer índice, pero lo leeremos en el loop
+            
             let ini = "[INIT]\n";
-            ini += "NumGrh=" + grhCount + "\n";
-            ini += "Version=" + version + "\n\n";
+            ini += `NumGrh=${grhCount}\n`;
+            ini += `Version=${fileVersion}\n\n`;
+            ini += "[Graphics]\n";
 
             let leidos = 0;
-            let totalBytes = view.byteLength;
 
-            while(true){
+            // 2. Leer cada entrada Grh
+            while (offset < view.byteLength) {
+                // Leer Índice del Grh
+                let grhIndex = readLong(view, offset); offset += 4;
 
-                if(offset >= totalBytes) break;
+                // Si llegamos al 0 final o al límite del archivo
+                if (grhIndex <= 0) break;
 
-                let grhIndex = readLong(view, offset); offset+=4;
+                let numFrames = readLong(view, offset); offset += 4;
 
-                if(grhIndex === 0) break;
+                if (numFrames === 1) {
+                    // Gráfico Simple
+                    let fileNum = readLong(view, offset); offset += 4;
+                    let sX = readLong(view, offset); offset += 4;
+                    let sY = readLong(view, offset); offset += 4;
+                    let width = readLong(view, offset); offset += 4;
+                    let height = readLong(view, offset); offset += 4;
 
-                let NumFrames = readLong(view, offset); offset+=4;
-
-                if(NumFrames <= 0 || NumFrames > 5000){
-                    console.log("Corte por dato inválido en:", grhIndex);
-                    break;
-                }
-
-                if(NumFrames === 1){
-
-                    let FileNum = readLong(view, offset); offset+=4;
-                    let sX = readLong(view, offset); offset+=4;
-                    let sY = readLong(view, offset); offset+=4;
-                    let w = readLong(view, offset); offset+=4;
-                    let h = readLong(view, offset); offset+=4;
-
-                    ini += `Grh${grhIndex}=${NumFrames}-${FileNum}-${sX}-${sY}-${w}-${h}\n`;
-
-                }else{
-
+                    ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${width}-${height}\n`;
+                } else {
+                    // Animación (Múltiples Frames)
                     let frames = [];
-
-                    for(let i=0;i<NumFrames;i++){
+                    for (let i = 0; i < numFrames; i++) {
                         frames.push(readLong(view, offset));
-                        offset+=4;
+                        offset += 4;
                     }
-
-                    let speed = readFloat(view, offset); offset+=4;
-                    speed = Math.round(speed);
-
-                    ini += `Grh${grhIndex}=${NumFrames}-${frames.join("-")}-${speed}\n`;
+                    let speed = readFloat(view, offset); offset += 4;
+                    
+                    // Formatear: GrhX=NumFrames-F1-F2-...-Fn-Velocidad
+                    ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${speed.toFixed(2)}\n`;
                 }
 
                 leidos++;
-
-                // 🔥 Actualiza barra cada 200 gráficos
-                if(leidos % 200 === 0){
-                    let progress = (offset / totalBytes) * 100;
-                    document.getElementById("bar").style.width = progress + "%";
-                    await new Promise(r => setTimeout(r, 1)); // libera UI
-                }
             }
 
             iniTexto = ini;
 
-            document.getElementById("bar").style.width = "100%";
+            // Actualizar interfaz
+            document.getElementById("info").innerHTML = 
+                `<span style="color:#0f0">✔ ÉXITO</span> | Versión: ${fileVersion} | Registrados: ${grhCount} | Procesados: ${leidos}`;
+            
+            // Mostrar vista previa (primeros 5000 caracteres)
+            document.getElementById("output").innerText = ini.substring(0, 5000) + "\n\n... (más datos abajo)";
 
-            document.getElementById("info").innerText =
-                "✔ Version: " + version +
-                " | Declarados: " + grhCount +
-                " | Leídos: " + leidos;
-
-            document.getElementById("output").innerText =
-                ini.substring(0, 3000) || "⚠ No se pudo leer contenido";
-
-        }catch(err){
-            console.error(err);
-            document.getElementById("output").innerText =
-                "❌ ERROR: " + err.message;
+        } catch (error) {
+            console.error(error);
+            document.getElementById("info").innerText = "❌ Error al procesar el archivo binario.";
         }
     };
 
     reader.readAsArrayBuffer(file);
 }
 
-function descargar(){
-    if(!iniTexto){
-        alert("Primero leé el archivo");
+function descargar() {
+    if (!iniTexto) {
+        alert("Primero debes procesar un archivo .ind");
         return;
     }
 
-    const blob = new Blob([iniTexto], {type:"text/plain"});
+    const blob = new Blob([iniTexto], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
     a.href = url;
     a.download = "Graficos.ini";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 </script>
 
