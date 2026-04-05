@@ -2,67 +2,61 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Extractor TSAO REAL</title>
+<title>TSAO FIX FINAL</title>
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
-<body style="background:#111;color:#0f0;font-family:monospace">
+<body style="background:#000;color:#0f0;font-family:monospace">
 
 <input type="file" id="file">
 <div id="log"></div>
 <div id="imgs"></div>
 
 <script>
-const log = t => document.getElementById("log").innerHTML += "> " + t + "<br>";
+const log = t => document.getElementById("log").innerHTML += "> "+t+"<br>";
 
-// clave XOR
 const keyStr = "quierovalecuatro";
-const key = new Uint8Array([...keyStr].map(c => c.charCodeAt(0)));
+const key = new Uint8Array([...keyStr].map(c=>c.charCodeAt(0)));
 
 document.getElementById("file").onchange = async e => {
 
-    let file = e.target.files[0];
-    let buffer = await file.arrayBuffer();
+    let buffer = await e.target.files[0].arrayBuffer();
     let dv = new DataView(buffer);
     let bytes = new Uint8Array(buffer);
 
-    log("Archivo cargado");
-
-    let offset = 0;
-
-    // ===== FILEHEADER =====
-    let totalSize = dv.getUint32(offset, true); offset += 4;
-    let numFiles = dv.getUint16(offset, true); offset += 2;
-
-    log("Archivos: " + numFiles);
-
-    // sanity check
-    if(numFiles <= 0 || numFiles > 50000){
-        log("Header inválido, probando offset 12...");
-        offset = 12;
-        totalSize = dv.getUint32(offset, true); offset += 4;
-        numFiles = dv.getUint16(offset, true); offset += 2;
-    }
+    log("Buscando entradas PNG...");
 
     let files = [];
 
-    // ===== INFOHEADERS =====
-    for(let i=0;i<numFiles;i++){
+    // 🔍 buscar ".png" en texto plano
+    for(let i=0;i<bytes.length-4;i++){
 
-        let start = dv.getUint32(offset, true); offset+=4;
-        let size = dv.getUint32(offset, true); offset+=4;
+        if(
+            bytes[i] === 0x2E && // .
+            bytes[i+1] === 0x70 && // p
+            bytes[i+2] === 0x6E && // n
+            bytes[i+3] === 0x67 // g
+        ){
 
-        let nameBytes = new Uint8Array(buffer, offset, 32);
-        let name = new TextDecoder().decode(nameBytes).replace(/\0/g,"");
-        offset+=32;
+            let nameStart = i-1;
+            while(nameStart>0 && bytes[nameStart] !== 0x00) nameStart--;
 
-        let origSize = dv.getUint32(offset, true); offset+=4;
+            let nameBytes = bytes.slice(nameStart+1, nameStart+33);
+            let name = new TextDecoder().decode(nameBytes).replace(/\0/g,"");
 
-        files.push({start,size,name,origSize});
+            // retroceder para leer estructura
+            let entryPos = nameStart - 8;
+
+            let start = dv.getUint32(entryPos, true);
+            let size  = dv.getUint32(entryPos+4, true);
+            let orig  = dv.getUint32(nameStart+32, true);
+
+            files.push({start,size,orig,name});
+        }
     }
 
-    log("Index leído");
+    log("Encontrados: " + files.length);
 
-    // ===== EXTRAER =====
+    // 🧪 extraer
     for(let i=0;i<files.length;i++){
 
         let f = files[i];
@@ -71,26 +65,26 @@ document.getElementById("file").onchange = async e => {
 
         let data = new Uint8Array(buffer.slice(f.start, f.start + f.size));
 
-        // XOR
+        // XOR real
         for(let j=0;j<data.length;j++){
             data[j] ^= key[j % key.length];
         }
 
-        try {
-            let decompressed = pako.inflate(data);
+        try{
+            let dec = pako.inflate(data);
 
-            let blob = new Blob([decompressed], {type:"image/png"});
+            let blob = new Blob([dec], {type:"image/png"});
             let url = URL.createObjectURL(blob);
 
             let img = document.createElement("img");
             img.src = url;
-            img.style.width = "120px";
-            img.title = f.name || ("img_"+i);
+            img.style.width = "100px";
+            img.title = f.name;
 
             document.getElementById("imgs").appendChild(img);
 
-        } catch(err){
-            log("Error en archivo " + i);
+        }catch(e){
+            log("Error en " + f.name);
         }
 
         if(i % 50 === 0) await new Promise(r=>setTimeout(r,1));
