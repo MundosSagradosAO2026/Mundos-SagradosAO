@@ -60,23 +60,22 @@ textarea{
 <body>
 
 <div class="box">
-<h2>📦 Editor Graficos.ind PRO</h2>
+<h2>📦 Editor Graficos.ind PRO (FIX REAL)</h2>
 
 <input type="file" id="fileInput"><br>
 
 <button onclick="leerIND()">Leer .IND</button>
 <button onclick="descargarINI()">Descargar .INI</button>
-<button onclick="generarIND()">Generar .IND desde INI</button>
+<button onclick="generarIND()">Generar .IND</button>
 
 <div class="progress">
 <div class="bar" id="bar"></div>
 </div>
 
 <p id="info"></p>
-
 <pre id="output"></pre>
 
-<h3>✏ Editor INI</h3>
+<h3>Editor INI</h3>
 <textarea id="iniEditor"></textarea>
 
 </div>
@@ -86,7 +85,7 @@ textarea{
 let iniTexto = "";
 
 /* =========================
-   LECTURA BINARIA SEGURA
+   LECTURA
 ========================= */
 
 function leerIND(){
@@ -110,17 +109,28 @@ function leerIND(){
             }
 
             function readLong(){
-                if(!canRead(4)) throw "EOF Long";
+                if(!canRead(4)) return null;
                 let v = view.getInt32(offset, true);
-                offset+=4;
+                offset += 4;
+                return v;
+            }
+
+            function readShort(){
+                if(!canRead(2)) return null;
+                let v = view.getInt16(offset, true);
+                offset += 2;
                 return v;
             }
 
             function readFloat(){
-                if(!canRead(4)) throw "EOF Float";
+                if(!canRead(4)) return null;
                 let v = view.getFloat32(offset, true);
-                offset+=4;
+                offset += 4;
                 return v;
+            }
+
+            function skip(n){
+                offset += n;
             }
 
             let version = readLong();
@@ -133,15 +143,18 @@ function leerIND(){
 
             let leidos = 0;
 
-            while(canRead(4)){
+            while(true){
 
                 let grhIndex = readLong();
-                if(grhIndex === 0) break;
+                if(grhIndex === null || grhIndex === 0) break;
 
-                let numFrames = readLong();
+                let numFrames = readShort();
+                if(numFrames === null) break;
 
-                if(numFrames <= 0){
-                    console.warn("Frame inválido", grhIndex);
+                skip(2); // 🔥 padding real del archivo
+
+                if(numFrames <= 0 || numFrames > 2000){
+                    console.warn("Frames inválidos:", numFrames);
                     break;
                 }
 
@@ -157,11 +170,9 @@ function leerIND(){
 
                     ini += `Grh${grhIndex}=1-${fileNum}-${sX}-${sY}-${w}-${h}\n`;
 
-                    if(grhIndex === 32761 && fileNum !== 5002){
-                        console.warn("⚠ Grh 32761 incorrecto");
-                    }
-
                 }else{
+
+                    if(!canRead(numFrames * 4 + 4)) break;
 
                     let frames = [];
 
@@ -170,9 +181,8 @@ function leerIND(){
                     }
 
                     let speed = readFloat();
-                    speed = speed.toFixed(2);
 
-                    ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${speed}\n`;
+                    ini += `Grh${grhIndex}=${numFrames}-${frames.join("-")}-${speed.toFixed(2)}\n`;
                 }
 
                 leidos++;
@@ -195,7 +205,8 @@ function leerIND(){
                 ini.substring(0, 3000);
 
         }catch(err){
-            document.getElementById("output").innerText = "ERROR: " + err;
+            document.getElementById("output").innerText =
+                "ERROR: " + err;
         }
     };
 
@@ -220,7 +231,7 @@ function descargarINI(){
 }
 
 /* =========================
-   GENERAR IND DESDE INI
+   GENERAR IND (COMPATIBLE)
 ========================= */
 
 function generarIND(){
@@ -232,7 +243,6 @@ function generarIND(){
 
     let version = 0;
     let numGrh = 0;
-
     let graficos = [];
 
     for(let l of lines){
@@ -259,8 +269,7 @@ function generarIND(){
             if(numFrames === 1){
 
                 graficos.push({
-                    index,
-                    numFrames,
+                    index, numFrames,
                     fileNum: parts[1],
                     sX: parts[2],
                     sY: parts[3],
@@ -274,27 +283,25 @@ function generarIND(){
                 let speed = parts[1 + numFrames];
 
                 graficos.push({
-                    index,
-                    numFrames,
-                    frames,
-                    speed
+                    index, numFrames,
+                    frames, speed
                 });
             }
         }
     }
 
-    // ordenar
     graficos.sort((a,b)=>a.index-b.index);
 
     let size = 8;
 
     graficos.forEach(g=>{
-        size += 8;
+        size += 4; // index
+        size += 4; // short+pad
 
         if(g.numFrames === 1){
             size += 20;
         }else{
-            size += (g.numFrames * 4) + 4;
+            size += g.numFrames * 4 + 4;
         }
     });
 
@@ -310,6 +317,11 @@ function generarIND(){
         offset+=4;
     }
 
+    function writeShort(v){
+        view.setInt16(offset, v, true);
+        offset+=2;
+    }
+
     function writeFloat(v){
         view.setFloat32(offset, v, true);
         offset+=4;
@@ -321,7 +333,9 @@ function generarIND(){
     graficos.forEach(g=>{
 
         writeLong(g.index);
-        writeLong(g.numFrames);
+
+        writeShort(g.numFrames);
+        writeShort(0); // 🔥 padding
 
         if(g.numFrames === 1){
 
@@ -347,7 +361,7 @@ function generarIND(){
     a.download = "Graficos.ind";
     a.click();
 
-    alert("✔ IND generado correctamente");
+    alert("✔ IND generado correctamente (formato real)");
 }
 
 </script>
