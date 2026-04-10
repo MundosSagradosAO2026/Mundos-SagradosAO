@@ -2,46 +2,137 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Amnerys - Suite AO</title>
+<title>Recursos Amnerys AO</title>
 
 <style>
-body { font-family: Consolas; background:#0a0a0a; color:#0f0; margin:0; }
-.view{ display:none; padding:20px; height:100vh; }
-.active{ display:block; }
-.header{ display:flex; gap:10px; margin-bottom:10px; }
-button{ padding:8px 15px; cursor:pointer; }
-#mapDebug{ background:#000; padding:10px; height:85%; overflow:auto; white-space:pre; }
-textarea{ width:100%; height:85%; background:#000; color:#0f0; }
+body{
+    margin:0;
+    font-family: Consolas, monospace;
+    background:#0b0b0b;
+    color:#00ff9c;
+}
+
+/* VISTAS */
+.view{ display:none; height:100vh; flex-direction:column; }
+.active{ display:flex; }
+
+/* HEADER */
+.header{
+    background:#111;
+    padding:10px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    border-bottom:1px solid #222;
+}
+
+/* TITULO */
+.title{
+    font-size:22px;
+    font-weight:bold;
+    color:#00ffcc;
+    text-shadow:0 0 10px #00ffcc;
+}
+
+/* BOTONES */
+button{
+    background:#1e1e1e;
+    border:1px solid #333;
+    color:#00ff9c;
+    padding:8px 15px;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+button:hover{
+    background:#00adb5;
+    color:#000;
+}
+
+/* CONTENIDO */
+.panel{
+    flex:1;
+    padding:10px;
+    overflow:auto;
+    background:#000;
+    border-top:1px solid #111;
+    white-space:pre;
+    font-size:13px;
+}
+
+/* TEXTAREA */
+textarea{
+    flex:1;
+    background:#000;
+    color:#00ff9c;
+    border:none;
+    padding:10px;
+    outline:none;
+    resize:none;
+}
+
+/* MENU */
+.menu{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    flex-direction:column;
+    gap:20px;
+}
+
+.menu h1{
+    font-size:40px;
+    color:#00ffcc;
+    text-shadow:0 0 20px #00ffcc;
+}
+
+.menu button{
+    width:250px;
+    font-size:16px;
+}
 </style>
 </head>
 
 <body>
 
-<div id="main" class="view active">
-    <button onclick="show('map')">MAP / INF / DAT</button>
-    <button onclick="show('ind')">IND</button>
+<!-- MENU -->
+<div id="main" class="view active menu">
+    <h1>RECURSOS AMNERYS AO</h1>
+    <button onclick="show('map')">📂 Analizador MAP / INF / DAT</button>
+    <button onclick="show('ind')">🖼️ Editor IND</button>
 </div>
 
+<!-- MAP -->
 <div id="map" class="view">
     <div class="header">
         <button onclick="show('main')">←</button>
-        <button onclick="mapInput.click()">MAP</button>
-        <button onclick="infInput.click()">INF</button>
-        <button onclick="datInput.click()">DAT</button>
+        <div class="title">Analizador de Mapas</div>
+
         <input type="file" id="mapInput" hidden>
         <input type="file" id="infInput" hidden>
         <input type="file" id="datInput" hidden>
+
+        <button onclick="mapInput.click()">MAP</button>
+        <button onclick="infInput.click()">INF</button>
+        <button onclick="datInput.click()">DAT</button>
     </div>
-    <div id="mapDebug"></div>
+
+    <div id="mapDebug" class="panel"></div>
 </div>
 
+<!-- IND -->
 <div id="ind" class="view">
     <div class="header">
         <button onclick="show('main')">←</button>
+        <div class="title">Editor Graficos.ind</div>
+
+        <input type="file" id="loadInd" hidden>
+
         <button onclick="loadInd.click()">Cargar IND</button>
         <button onclick="saveIni()">Exportar INI</button>
-        <input type="file" id="loadInd" hidden>
     </div>
+
     <textarea id="editor"></textarea>
 </div>
 
@@ -59,7 +150,7 @@ mapInput.onchange = async e=>{
     const buf = await file.arrayBuffer();
     const view = new DataView(buf);
 
-    let out = "MAP\n\n";
+    let out = "=== MAPA ===\n\n";
 
     let offset = 272;
     let count = 0;
@@ -73,7 +164,7 @@ mapInput.onchange = async e=>{
             let grh = view.getUint16(offset+1,true);
 
             if(count<500)
-                out += `${x},${y} | ${block} | ${grh}\n`;
+                out += `[${x},${y}]  Block:${block}  GRH:${grh}\n`;
 
             offset+=3;
             count++;
@@ -85,14 +176,14 @@ mapInput.onchange = async e=>{
 };
 
 //////////////////////////////////////////////////
-// INF (ARREGLADO REAL)
+// INF
 //////////////////////////////////////////////////
 infInput.onchange = async e=>{
     const file = e.target.files[0];
     const buf = await file.arrayBuffer();
     const view = new DataView(buf);
 
-    let out = "INF DECODIFICADO\n\n";
+    let out = "=== INF (EVENTOS) ===\n\n";
 
     let offset = 0;
     let count = 0;
@@ -101,13 +192,8 @@ infInput.onchange = async e=>{
 
         if(view.getUint8(offset)==1 && view.getUint8(offset+1)==2){
 
-            // FIX REAL
             const tipo = view.getUint8(offset+3);
             const id   = view.getUint8(offset+5);
-
-            out += `Bloque ${count}\n`;
-            out += `Offset: 0x${offset.toString(16)}\n`;
-            out += `Tipo: ${tipo} | ID: ${id}\n`;
 
             let data = [];
             let hasData = false;
@@ -120,10 +206,10 @@ infInput.onchange = async e=>{
             }
 
             if(hasData){
-                out += `DATA REAL: ${data.join(" ")}\n`;
+                out += `EVENTO #${count}\n`;
+                out += `Tipo: ${tipo} | TileID: ${id}\n`;
+                out += `Data: ${data.join(" ")}\n\n`;
             }
-
-            out += "\n";
 
             count++;
             offset+=6;
@@ -137,24 +223,19 @@ infInput.onchange = async e=>{
 };
 
 //////////////////////////////////////////////////
-// DAT (ARREGLADO → TEXTO REAL)
+// DAT
 //////////////////////////////////////////////////
 datInput.onchange = async e=>{
     const file = e.target.files[0];
     const buf = await file.arrayBuffer();
 
-    // convertir a texto
     let text = new TextDecoder("latin1").decode(buf);
 
-    let out = "DAT (INI DETECTADO)\n\n";
+    let out = "=== CONFIG MAPA (.DAT) ===\n\n";
 
-    // limpiar caracteres raros
-    let lines = text.split(/\r?\n/);
-
-    for(let line of lines){
-        if(line.trim() !== "")
-            out += line + "\n";
-    }
+    text.split(/\r?\n/).forEach(l=>{
+        if(l.trim() !== "") out += l + "\n";
+    });
 
     mapDebug.innerText = out;
 };
