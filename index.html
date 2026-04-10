@@ -37,6 +37,9 @@
         .item-missing { color: #ff0000; background: rgba(255,0,0,0.15); font-weight: bold; border-radius: 4px; }
         .summary-bar { background: #222; padding: 15px; display: flex; gap: 30px; font-size: 1.1em; border-top: 1px solid #333; }
         .missing-count { color: #ff4d4d; }
+
+        /* --- MAP SCANNER --- */
+        #mapDebug { flex: 1; background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; overflow-y: auto; font-size: 12px; white-space: pre; }
     </style>
 </head>
 <body>
@@ -53,7 +56,13 @@
             <div class="card" onclick="showView('validatorContainer')">
                 <i>📁</i>
                 <h3>Analizador de Recursos</h3>
-                <p>Detectar saltos en la numeración de imágenes</p>
+                <p>Detectar saltos en la numeración</p>
+            </div>
+
+            <div class="card" onclick="showView('mapScannerContainer')">
+                <i>🗺️</i>
+                <h3>Analizador de Mapas</h3>
+                <p>Explorar estructura binaria .MAP</p>
             </div>
 
             <div class="card" style="opacity: 0.4; cursor: not-allowed;">
@@ -85,18 +94,26 @@
             <button class="btn btn-action" onclick="document.getElementById('folderInput').click()">📁 Seleccionar Carpeta de Gráficos</button>
             <div class="status" id="statusVal">Sin analizar</div>
         </div>
-        
         <div class="validator-layout">
             <div id="reportList" class="report-list">
-                <div style="text-align: center; margin-top: 50px; color: #555;">
-                    Sube la carpeta de gráficos para verificar que no falte ningún número entre el primero y el último.
-                </div>
+                <div style="text-align: center; margin-top: 50px; color: #555;">Sube la carpeta de gráficos.</div>
             </div>
             <div class="summary-bar" id="summaryBar">
                 <span>Total: 0</span>
                 <span class="missing-count">Faltantes: 0</span>
             </div>
         </div>
+    </div>
+
+    <div id="mapScannerContainer" class="view">
+        <div class="header">
+            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
+            <strong>Explorador Binario .MAP</strong>
+            <input type="file" id="mapInput" style="display:none">
+            <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar Mapa Binario</button>
+            <div class="status" id="statusMap">Esperando archivo...</div>
+        </div>
+        <div id="mapDebug">Selecciona un archivo .map para ver su estructura hexadecimal interna.</div>
     </div>
 
 <script>
@@ -106,31 +123,67 @@
         document.getElementById(viewId).classList.add('active');
     }
 
-    // --- LÓGICA DEL VALIDADOR (NUEVA) ---
+    // --- LÓGICA DE MAPAS (ESCÁNER BINARIO) ---
+    document.getElementById('mapInput').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        let output = `ARCHIVO: ${file.name}\n`;
+        output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
+        output += `------------------------------------------------------------\n`;
+
+        // Lectura de la posible cabecera (Int32)
+        try {
+            const header = view.getInt32(0, true);
+            output += `CABECERA DETECTADA (Int32): ${header}\n\n`;
+        } catch(e) {}
+
+        output += `VOLCADO HEXADECIMAL (Primeros 512 bytes):\n`;
+        output += `Offset | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | ASCII\n`;
+        output += `-------|-------------------------------------------------|----------\n`;
+
+        for (let i = 0; i < 512 && i < buffer.byteLength; i += 16) {
+            let offset = i.toString(16).toUpperCase().padStart(6, '0');
+            let hexRow = "";
+            let asciiRow = "";
+
+            for (let j = 0; j < 16; j++) {
+                if (i + j < buffer.byteLength) {
+                    const byte = view.getUint8(i + j);
+                    hexRow += byte.toString(16).toUpperCase().padStart(2, '0') + " ";
+                    asciiRow += (byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : ".";
+                } else {
+                    hexRow += "   ";
+                }
+            }
+            output += `${offset} | ${hexRow} | ${asciiRow}\n`;
+        }
+
+        document.getElementById('mapDebug').innerText = output;
+        document.getElementById('statusMap').innerText = "Análisis binario completado.";
+    };
+
+    // --- LÓGICA DEL VALIDADOR ---
     document.getElementById('folderInput').onchange = (e) => {
         const files = Array.from(e.target.files);
         const reportList = document.getElementById('reportList');
         const summaryBar = document.getElementById('summaryBar');
         
-        // Filtrar archivos que empiecen con número y sean imágenes
         let numbers = files
-            .map(f => {
-                const name = f.name.split('.')[0];
-                return parseInt(name);
-            })
+            .map(f => parseInt(f.name.split('.')[0]))
             .filter(n => !isNaN(n))
             .sort((a, b) => a - b);
 
         if (numbers.length === 0) {
-            reportList.innerHTML = "<div style='color:orange; text-align:center;'>No se encontraron imágenes con nombres numéricos (ej: 1.png).</div>";
+            reportList.innerHTML = "<div style='color:orange; text-align:center;'>No se encontraron imágenes numéricas.</div>";
             return;
         }
 
-        const min = numbers[0];
-        const max = numbers[numbers.length - 1];
+        const min = numbers[0], max = numbers[numbers.length - 1];
         const numSet = new Set(numbers);
-        let html = "";
-        let missing = 0;
+        let html = "", missing = 0;
 
         for (let i = min; i <= max; i++) {
             if (numSet.has(i)) {
@@ -140,13 +193,12 @@
                 missing++;
             }
         }
-
         reportList.innerHTML = html;
-        summaryBar.innerHTML = `<span>Rango: ${min} al ${max}</span> <span>Total archivos: ${numbers.length}</span> <span class="missing-count">Faltantes detectados: ${missing}</span>`;
+        summaryBar.innerHTML = `<span>Rango: ${min}-${max}</span> <span>Total: ${numbers.length}</span> <span class="missing-count">Faltantes: ${missing}</span>`;
         document.getElementById('statusVal').innerText = "Análisis completado.";
     };
 
-    // --- LÓGICA DEL EDITOR (CONSERVADA) ---
+    // --- LÓGICA DEL EDITOR .IND ---
     const editor = document.getElementById('editor');
     let version = 447;
 
