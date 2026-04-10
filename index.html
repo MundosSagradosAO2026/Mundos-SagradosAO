@@ -7,7 +7,7 @@
 <style>
 body{
     margin:0;
-    font-family: Consolas, monospace;
+    font-family: Consolas;
     background:#0b0b0b;
     color:#00ff9c;
 }
@@ -26,12 +26,9 @@ body{
     border-bottom:1px solid #222;
 }
 
-/* TITULO */
 .title{
-    font-size:22px;
-    font-weight:bold;
+    font-size:20px;
     color:#00ffcc;
-    text-shadow:0 0 10px #00ffcc;
 }
 
 /* BOTONES */
@@ -41,7 +38,6 @@ button{
     color:#00ff9c;
     padding:8px 15px;
     cursor:pointer;
-    transition:0.2s;
 }
 
 button:hover{
@@ -49,26 +45,13 @@ button:hover{
     color:#000;
 }
 
-/* CONTENIDO */
+/* PANEL */
 .panel{
     flex:1;
+    background:#000;
     padding:10px;
     overflow:auto;
-    background:#000;
-    border-top:1px solid #111;
     white-space:pre;
-    font-size:13px;
-}
-
-/* TEXTAREA */
-textarea{
-    flex:1;
-    background:#000;
-    color:#00ff9c;
-    border:none;
-    padding:10px;
-    outline:none;
-    resize:none;
 }
 
 /* MENU */
@@ -82,14 +65,8 @@ textarea{
 }
 
 .menu h1{
-    font-size:40px;
     color:#00ffcc;
-    text-shadow:0 0 20px #00ffcc;
-}
-
-.menu button{
-    width:250px;
-    font-size:16px;
+    text-shadow:0 0 15px #00ffcc;
 }
 </style>
 </head>
@@ -99,41 +76,53 @@ textarea{
 <!-- MENU -->
 <div id="main" class="view active menu">
     <h1>RECURSOS AMNERYS AO</h1>
-    <button onclick="show('map')">📂 Analizador MAP / INF / DAT</button>
+
+    <button onclick="mapInput.click()">📂 Abrir MAP</button>
+    <button onclick="infInput.click()">📁 Abrir INF</button>
+    <button onclick="datInput.click()">⚙️ Abrir DAT</button>
     <button onclick="show('ind')">🖼️ Editor IND</button>
+
+    <input type="file" id="mapInput" hidden>
+    <input type="file" id="infInput" hidden>
+    <input type="file" id="datInput" hidden>
 </div>
 
-<!-- MAP -->
-<div id="map" class="view">
+<!-- MAP VIEW -->
+<div id="viewMap" class="view">
     <div class="header">
         <button onclick="show('main')">←</button>
-        <div class="title">Analizador de Mapas</div>
-
-        <input type="file" id="mapInput" hidden>
-        <input type="file" id="infInput" hidden>
-        <input type="file" id="datInput" hidden>
-
-        <button onclick="mapInput.click()">MAP</button>
-        <button onclick="infInput.click()">INF</button>
-        <button onclick="datInput.click()">DAT</button>
+        <div class="title">MAPA</div>
     </div>
+    <div id="mapPanel" class="panel"></div>
+</div>
 
-    <div id="mapDebug" class="panel"></div>
+<!-- INF VIEW -->
+<div id="viewInf" class="view">
+    <div class="header">
+        <button onclick="show('main')">←</button>
+        <div class="title">INF (EVENTOS)</div>
+    </div>
+    <div id="infPanel" class="panel"></div>
+</div>
+
+<!-- DAT VIEW -->
+<div id="viewDat" class="view">
+    <div class="header">
+        <button onclick="show('main')">←</button>
+        <div class="title">DAT (CONFIG)</div>
+    </div>
+    <div id="datPanel" class="panel"></div>
 </div>
 
 <!-- IND -->
 <div id="ind" class="view">
     <div class="header">
         <button onclick="show('main')">←</button>
-        <div class="title">Editor Graficos.ind</div>
-
-        <input type="file" id="loadInd" hidden>
-
         <button onclick="loadInd.click()">Cargar IND</button>
         <button onclick="saveIni()">Exportar INI</button>
+        <input type="file" id="loadInd" hidden>
     </div>
-
-    <textarea id="editor"></textarea>
+    <textarea id="editor" style="flex:1;background:#000;color:#0f0;"></textarea>
 </div>
 
 <script>
@@ -150,7 +139,7 @@ mapInput.onchange = async e=>{
     const buf = await file.arrayBuffer();
     const view = new DataView(buf);
 
-    let out = "=== MAPA ===\n\n";
+    let out = "MAPA\n\n";
 
     let offset = 272;
     let count = 0;
@@ -164,7 +153,7 @@ mapInput.onchange = async e=>{
             let grh = view.getUint16(offset+1,true);
 
             if(count<500)
-                out += `[${x},${y}]  Block:${block}  GRH:${grh}\n`;
+                out += `[${x},${y}] Block:${block} GRH:${grh}\n`;
 
             offset+=3;
             count++;
@@ -172,7 +161,9 @@ mapInput.onchange = async e=>{
     }
 
     out += "\nTotal tiles: "+count;
-    mapDebug.innerText = out;
+
+    mapPanel.innerText = out;
+    show("viewMap");
 };
 
 //////////////////////////////////////////////////
@@ -183,10 +174,9 @@ infInput.onchange = async e=>{
     const buf = await file.arrayBuffer();
     const view = new DataView(buf);
 
-    let out = "=== INF (EVENTOS) ===\n\n";
+    let out = "EVENTOS INF\n\n";
 
     let offset = 0;
-    let count = 0;
 
     while(offset < buf.byteLength-6){
 
@@ -195,31 +185,22 @@ infInput.onchange = async e=>{
             const tipo = view.getUint8(offset+3);
             const id   = view.getUint8(offset+5);
 
-            let data = [];
             let hasData = false;
 
-            for(let i=0;i<16;i++){
-                if(offset+6+i>=buf.byteLength) break;
-                let b = view.getUint8(offset+6+i);
-                if(b!==0) hasData = true;
-                data.push(b.toString(16).padStart(2,'0'));
+            for(let i=0;i<10;i++){
+                if(view.getUint8(offset+6+i)!==0) hasData = true;
             }
 
             if(hasData){
-                out += `EVENTO #${count}\n`;
-                out += `Tipo: ${tipo} | TileID: ${id}\n`;
-                out += `Data: ${data.join(" ")}\n\n`;
+                out += `Tile ${id} | Tipo ${tipo}\n`;
             }
 
-            count++;
             offset+=6;
-        }else{
-            offset++;
-        }
+        }else offset++;
     }
 
-    out += `TOTAL BLOQUES: ${count}`;
-    mapDebug.innerText = out;
+    infPanel.innerText = out;
+    show("viewInf");
 };
 
 //////////////////////////////////////////////////
@@ -231,17 +212,18 @@ datInput.onchange = async e=>{
 
     let text = new TextDecoder("latin1").decode(buf);
 
-    let out = "=== CONFIG MAPA (.DAT) ===\n\n";
+    let out = "CONFIG MAPA\n\n";
 
     text.split(/\r?\n/).forEach(l=>{
-        if(l.trim() !== "") out += l + "\n";
+        if(l.trim()) out+=l+"\n";
     });
 
-    mapDebug.innerText = out;
+    datPanel.innerText = out;
+    show("viewDat");
 };
 
 //////////////////////////////////////////////////
-// IND (NO TOCADO)
+// IND (igual)
 //////////////////////////////////////////////////
 loadInd.onchange = async e=>{
     const file = e.target.files[0];
