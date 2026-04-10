@@ -2,140 +2,128 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Amnerys - Suite de Desarrollo AO</title>
+<title>Amnerys - Suite AO</title>
 
 <style>
-body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-.view { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
-.active { display: flex !important; }
-#mainMenu { align-items: center; justify-content: center; gap: 20px; }
-.logo-title { font-size: 3em; text-shadow: 0 0 15px #00ff00; margin-bottom: 20px; color: #fff; }
-.grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; }
-.card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
-.card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; }
-.header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
-.btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; }
-.btn-back { background: #ff4d4d; color: white; }
-.btn-action { background: #00adb5; color: white; }
-.btn-secondary { background: #444; color: white; }
-.status { color: #888; font-size: 12px; margin-left: auto; }
-#editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 15px; font-size: 14px; resize: none; }
-#mapDebug { flex: 1; background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; overflow-y: auto; font-size: 12px; white-space: pre; }
+body { font-family: Consolas; background:#0a0a0a; color:#0f0; margin:0; }
+.view{ display:none; padding:20px; height:100vh; }
+.active{ display:block; }
+.header{ display:flex; gap:10px; margin-bottom:10px; }
+button{ padding:8px 15px; cursor:pointer; }
+#mapDebug{ background:#000; padding:10px; height:85%; overflow:auto; white-space:pre; }
+textarea{ width:100%; height:85%; background:#000; color:#0f0; }
 </style>
 </head>
 
 <body>
 
-<div id="mainMenu" class="view active">
-    <div class="logo-title">AMNERYS SUITE</div>
-    <div class="grid-buttons">
-        <div class="card" onclick="showView('editorContainer')">Editor .IND</div>
-        <div class="card" onclick="showView('mapScannerContainer')">Analizador MAP / INF / DAT</div>
-    </div>
+<div id="main" class="view active">
+    <button onclick="show('map')">MAP / INF / DAT</button>
+    <button onclick="show('ind')">IND</button>
 </div>
 
-<div id="editorContainer" class="view">
+<div id="map" class="view">
     <div class="header">
-        <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-        <strong>Indexador Graficos.ind</strong>
-        <input type="file" id="loadInd" style="display:none">
-        <button class="btn btn-secondary" onclick="loadInd.click()">Cargar .IND</button>
-        <button class="btn btn-secondary" onclick="saveIni()">Exportar .INI</button>
-        <div class="status">IND intacto</div>
-    </div>
-    <textarea id="editor"></textarea>
-</div>
-
-<div id="mapScannerContainer" class="view">
-    <div class="header">
-        <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-        <input type="file" id="mapInput" style="display:none">
-        <input type="file" id="infInput" style="display:none">
-        <input type="file" id="datInput" style="display:none">
-        <button class="btn btn-action" onclick="mapInput.click()">Cargar .MAP</button>
-        <button class="btn btn-secondary" onclick="infInput.click()">Cargar .INF</button>
-        <button class="btn btn-secondary" onclick="datInput.click()">Cargar .DAT</button>
-        <div class="status" id="statusMap">Esperando archivo...</div>
+        <button onclick="show('main')">←</button>
+        <button onclick="mapInput.click()">MAP</button>
+        <button onclick="infInput.click()">INF</button>
+        <button onclick="datInput.click()">DAT</button>
+        <input type="file" id="mapInput" hidden>
+        <input type="file" id="infInput" hidden>
+        <input type="file" id="datInput" hidden>
     </div>
     <div id="mapDebug"></div>
 </div>
 
+<div id="ind" class="view">
+    <div class="header">
+        <button onclick="show('main')">←</button>
+        <button onclick="loadInd.click()">Cargar IND</button>
+        <button onclick="saveIni()">Exportar INI</button>
+        <input type="file" id="loadInd" hidden>
+    </div>
+    <textarea id="editor"></textarea>
+</div>
+
 <script>
-function showView(v){
+function show(v){
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
     document.getElementById(v).classList.add('active');
 }
 
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // MAP
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
 mapInput.onchange = async e=>{
     const file = e.target.files[0];
-    const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
+    const buf = await file.arrayBuffer();
+    const view = new DataView(buf);
 
-    let output = `MAP: ${file.name}\n\n`;
+    let out = "MAP\n\n";
 
-    const START = 272;
-    const SIZE = 3;
-    const W = 100;
-    const H = 100;
-
-    let offset = START;
+    let offset = 272;
     let count = 0;
 
-    for(let y=0;y<H;y++){
-        for(let x=0;x<W;x++){
-            if(offset+3>buffer.byteLength) break;
+    for(let y=0;y<100;y++){
+        for(let x=0;x<100;x++){
 
-            const block = view.getUint8(offset);
-            const grh = view.getUint16(offset+1,true);
+            if(offset+3>buf.byteLength) break;
 
-            if(count<500){
-                output += `${x},${y} | ${block} | ${grh}\n`;
-            }
+            let block = view.getUint8(offset);
+            let grh = view.getUint16(offset+1,true);
 
-            offset+=SIZE;
+            if(count<500)
+                out += `${x},${y} | ${block} | ${grh}\n`;
+
+            offset+=3;
             count++;
         }
     }
 
-    output += `\nTotal tiles: ${count}`;
-    mapDebug.innerText = output;
-    statusMap.innerText = "MAP OK";
+    out += "\nTotal tiles: "+count;
+    mapDebug.innerText = out;
 };
 
-////////////////////////////////////////////////////////////
-// INF (DECODIFICADO)
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// INF (ARREGLADO REAL)
+//////////////////////////////////////////////////
 infInput.onchange = async e=>{
     const file = e.target.files[0];
-    const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
+    const buf = await file.arrayBuffer();
+    const view = new DataView(buf);
 
-    let output = `INF: ${file.name}\n\n`;
+    let out = "INF DECODIFICADO\n\n";
 
     let offset = 0;
     let count = 0;
 
-    while(offset < buffer.byteLength-6){
+    while(offset < buf.byteLength-6){
 
-        if(view.getUint8(offset)===1 && view.getUint8(offset+1)===2){
+        if(view.getUint8(offset)==1 && view.getUint8(offset+1)==2){
 
-            const tipo = view.getUint16(offset+2,true);
-            const id = view.getUint16(offset+4,true);
+            // FIX REAL
+            const tipo = view.getUint8(offset+3);
+            const id   = view.getUint8(offset+5);
 
-            output += `Bloque ${count}\n`;
-            output += `Offset: 0x${offset.toString(16)}\n`;
-            output += `Tipo: ${tipo} | ID: ${id}\n`;
+            out += `Bloque ${count}\n`;
+            out += `Offset: 0x${offset.toString(16)}\n`;
+            out += `Tipo: ${tipo} | ID: ${id}\n`;
 
-            let data=[];
+            let data = [];
+            let hasData = false;
+
             for(let i=0;i<16;i++){
-                if(offset+6+i>=buffer.byteLength) break;
-                data.push(view.getUint8(offset+6+i).toString(16).padStart(2,'0'));
+                if(offset+6+i>=buf.byteLength) break;
+                let b = view.getUint8(offset+6+i);
+                if(b!==0) hasData = true;
+                data.push(b.toString(16).padStart(2,'0'));
             }
 
-            output += `Data: ${data.join(' ')}\n\n`;
+            if(hasData){
+                out += `DATA REAL: ${data.join(" ")}\n`;
+            }
+
+            out += "\n";
 
             count++;
             offset+=6;
@@ -144,45 +132,36 @@ infInput.onchange = async e=>{
         }
     }
 
-    output += `TOTAL BLOQUES: ${count}`;
-    mapDebug.innerText = output;
-    statusMap.innerText = "INF OK";
+    out += `TOTAL BLOQUES: ${count}`;
+    mapDebug.innerText = out;
 };
 
-////////////////////////////////////////////////////////////
-// DAT (NUEVO)
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// DAT (ARREGLADO → TEXTO REAL)
+//////////////////////////////////////////////////
 datInput.onchange = async e=>{
     const file = e.target.files[0];
-    const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
+    const buf = await file.arrayBuffer();
 
-    let output = `DAT: ${file.name}\n\n`;
+    // convertir a texto
+    let text = new TextDecoder("latin1").decode(buf);
 
-    // Explorador inteligente
-    for(let i=0;i<buffer.byteLength;i+=16){
+    let out = "DAT (INI DETECTADO)\n\n";
 
-        let hex="";
-        let ascii="";
+    // limpiar caracteres raros
+    let lines = text.split(/\r?\n/);
 
-        for(let j=0;j<16;j++){
-            if(i+j<buffer.byteLength){
-                let b=view.getUint8(i+j);
-                hex+=b.toString(16).padStart(2,'0')+" ";
-                ascii+=(b>=32&&b<=126)?String.fromCharCode(b):".";
-            }
-        }
-
-        output += `${i.toString(16).padStart(4,'0')} | ${hex.padEnd(48)} | ${ascii}\n`;
+    for(let line of lines){
+        if(line.trim() !== "")
+            out += line + "\n";
     }
 
-    mapDebug.innerText = output;
-    statusMap.innerText = "DAT ANALIZADO";
+    mapDebug.innerText = out;
 };
 
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
 // IND (NO TOCADO)
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////
 loadInd.onchange = async e=>{
     const file = e.target.files[0];
     const buffer = await file.arrayBuffer();
