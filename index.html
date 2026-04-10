@@ -12,7 +12,6 @@
         .grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; }
         .card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
         .card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; box-shadow: 0 5px 20px rgba(0, 173, 181, 0.3); }
-        .card i { font-size: 2.5em; display: block; margin-bottom: 15px; }
         .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
         .btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; transition: 0.2s; font-family: 'Consolas', monospace; }
         .btn-back { background: #ff4d4d; color: white; }
@@ -20,173 +19,159 @@
         .btn-secondary { background: #444; color: white; }
         .status { color: #888; font-size: 12px; margin-left: auto; }
         #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 15px; font-size: 14px; resize: none; outline: none; }
-        .validator-layout { flex: 1; display: flex; flex-direction: column; background: #111; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
-        .report-list { flex: 1; overflow-y: auto; padding: 20px; }
-        .item-row { padding: 5px 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
-        .item-ok { color: #00ff00; opacity: 0.6; }
-        .item-missing { color: #ff0000; background: rgba(255,0,0,0.15); font-weight: bold; border-radius: 4px; }
-        .summary-bar { background: #222; padding: 15px; display: flex; gap: 30px; font-size: 1.1em; border-top: 1px solid #333; }
         #mapDebug { flex: 1; background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; overflow-y: auto; font-size: 12px; white-space: pre; }
     </style>
 </head>
 <body>
 
-    <div id="mainMenu" class="view active">
-        <div class="logo-title">AMNERYS SUITE</div>
-        <div class="grid-buttons">
-            <div class="card" onclick="showView('editorContainer')">
-                <i>🖼️</i>
-                <h3>Editor Index AO</h3>
-                <p>Modificar Graficos.ind y .ini</p>
-            </div>
-            <div class="card" onclick="showView('validatorContainer')">
-                <i>📁</i>
-                <h3>Analizador de Recursos</h3>
-                <p>Detectar saltos en la numeración</p>
-            </div>
-            <div class="card" onclick="showView('mapScannerContainer')">
-                <i>🗺️</i>
-                <h3>Analizador de Mapas</h3>
-                <p>Descifrar Gráficos de Mapa</p>
-            </div>
-            <div class="card" style="opacity: 0.4; cursor: not-allowed;">
-                <i>⚔️</i>
-                <h3>Editor de Items</h3>
-                <p>(En desarrollo)</p>
-            </div>
-        </div>
+<div id="mainMenu" class="view active">
+    <div class="logo-title">AMNERYS SUITE</div>
+    <div class="grid-buttons">
+        <div class="card" onclick="showView('editorContainer')">Editor Index AO</div>
+        <div class="card" onclick="showView('mapScannerContainer')">Analizador de Mapas</div>
     </div>
+</div>
 
-    <div id="editorContainer" class="view">
-        <div class="header">
-            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-            <strong>Indexador Graficos.ind</strong>
-            <input type="file" id="loadInd" style="display:none">
-            <button class="btn btn-secondary" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
-            <button class="btn btn-action" onclick="saveInd()">Exportar .IND</button>
-            <button class="btn btn-secondary" onclick="saveIni()">Exportar .INI</button>
-            <div class="status" id="statusEditor">Listo</div>
-        </div>
-        <textarea id="editor" placeholder="Contenido de los gráficos..."></textarea>
+<div id="editorContainer" class="view">
+    <div class="header">
+        <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
+        <strong>Indexador Graficos.ind</strong>
+        <input type="file" id="loadInd" style="display:none">
+        <button class="btn btn-secondary" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
+        <button class="btn btn-secondary" onclick="saveIni()">Exportar .INI</button>
+        <div class="status" id="statusEditor">Listo</div>
     </div>
+    <textarea id="editor"></textarea>
+</div>
 
-    <div id="validatorContainer" class="view">
-        <div class="header">
-            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-            <strong>Validador de Secuencia</strong>
-            <input type="file" id="folderInput" style="display:none" webkitdirectory directory multiple>
-            <button class="btn btn-action" onclick="document.getElementById('folderInput').click()">📁 Seleccionar Carpeta</button>
-            <div class="status" id="statusVal">Sin analizar</div>
-        </div>
-        <div class="validator-layout">
-            <div id="reportList" class="report-list"></div>
-            <div class="summary-bar" id="summaryBar"><span>Total: 0</span></div>
-        </div>
+<div id="mapScannerContainer" class="view">
+    <div class="header">
+        <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
+        <strong>Decodificador .MAP</strong>
+        <input type="file" id="mapInput" style="display:none">
+        <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar Mapa</button>
+        <div class="status" id="statusMap">Listo</div>
     </div>
-
-    <div id="mapScannerContainer" class="view">
-        <div class="header">
-            <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-            <strong>Decodificador .MAP</strong>
-            <input type="file" id="mapInput" style="display:none">
-            <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar Mapa</button>
-            <div class="status" id="statusMap">Listo</div>
-        </div>
-        <div id="mapDebug">Selecciona un archivo .map para decodificar los gráficos de la Capa 1.</div>
-    </div>
+    <div id="mapDebug">Selecciona un archivo .map</div>
+</div>
 
 <script>
-    function showView(viewId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(viewId).classList.add('active');
+function showView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+}
+
+// ================= MAP DECODER COMPLETO =================
+document.getElementById('mapInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const view = new DataView(buffer);
+
+    let output = `ARCHIVO: ${file.name}\n`;
+
+    const version = view.getUint8(0);
+    output += `VERSIÓN AO: ${version}\n`;
+    output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
+    output += `------------------------------------------------------------\n`;
+
+    const MAP_WIDTH = 100;
+    const MAP_HEIGHT = 100;
+    const TILE_SIZE = 3;
+    const START_OFFSET = 272;
+
+    let offset = START_OFFSET;
+    let tiles = [];
+
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+        for (let x = 0; x < MAP_WIDTH; x++) {
+
+            if (offset + 3 > buffer.byteLength) break;
+
+            const blocked = view.getUint8(offset);
+            const grh = view.getUint16(offset + 1, true);
+
+            tiles.push({ x, y, blocked, grh });
+
+            offset += TILE_SIZE;
+        }
     }
 
-    // --- LÓGICA DE MAPAS ACTUALIZADA ---
-    document.getElementById('mapInput').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    const MAX_PRINT = 500;
 
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        let output = `ARCHIVO: ${file.name}\n`;
-        
-        // Cabecera
-        const version = view.getUint8(0);
-        output += `VERSIÓN AO: ${version}\n`;
-        output += `------------------------------------------------------------\n`;
-        output += `BLOQUE DE TILE (Offset inicial: 0x000110)\n\n`;
-        output += `Coordenada | Bloqueo | Grh Capa 1\n`;
-        output += `-----------|---------|-----------\n`;
+    output += `MAPA (${MAP_WIDTH}x${MAP_HEIGHT})\n`;
+    output += `X,Y | Block | GRH\n`;
+    output += `--------------------------------\n`;
 
-        let offset = 272; // Saltamos los ceros iniciales (0x000110)
-        let tileCount = 0;
+    for (let i = 0; i < tiles.length && i < MAX_PRINT; i++) {
+        const t = tiles[i];
+        output += `${t.x},${t.y} | ${t.blocked} | ${t.grh}\n`;
+    }
 
-        // Leemos una porción del mapa para no saturar el navegador
-        for (let i = 0; i < 100 && offset + 3 <= buffer.byteLength; i++) {
-            const blocked = view.getUint8(offset);
-            const grh = view.getUint16(offset + 1, true); // Little Endian
-            
-            output += `Tile ${i.toString().padStart(3, '0')}   |   ${blocked}     |   ${grh}\n`;
-            offset += 3; // Estructura de 3 bytes detectada en tu volcado
-        }
+    output += `\nTotal tiles: ${tiles.length}\n`;
 
-        output += `\n... (Decodificación parcial para análisis de estructura) ...`;
-        document.getElementById('mapDebug').innerText = output;
-        document.getElementById('statusMap').innerText = "Mapa decodificado.";
-    };
+    if (tiles.length > MAX_PRINT) {
+        output += `⚠️ Limitado a ${MAX_PRINT} tiles\n`;
+    }
 
-    // --- LÓGICA DEL VALIDADOR ---
-    document.getElementById('folderInput').onchange = (e) => {
-        const files = Array.from(e.target.files);
-        const reportList = document.getElementById('reportList');
-        let numbers = files.map(f => parseInt(f.name.split('.')[0])).filter(n => !isNaN(n)).sort((a, b) => a - b);
-        if (numbers.length === 0) return;
-        const min = numbers[0], max = numbers[numbers.length - 1];
-        const numSet = new Set(numbers);
-        let html = "", missing = 0;
-        for (let i = min; i <= max; i++) {
-            if (numSet.has(i)) html += `<div class="item-row item-ok"><span>Archivo ${i}</span><span>✔ OK</span></div>`;
-            else { html += `<div class="item-row item-missing"><span>FALTANTE: ${i}</span><span>✖</span></div>`; missing++; }
-        }
-        reportList.innerHTML = html;
-        document.getElementById('summaryBar').innerText = `Rango: ${min}-${max} | Total: ${numbers.length} | Faltantes: ${missing}`;
-    };
+    document.getElementById('mapDebug').innerText = output;
+    document.getElementById('statusMap').innerText = "Mapa decodificado completo";
+};
 
-    // --- LÓGICA DEL EDITOR .IND ---
-    const editor = document.getElementById('editor');
-    document.getElementById('loadInd').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        let offset = 0;
-        const ver = view.getInt32(offset, true); offset += 4;
-        const total = view.getInt32(offset, true); offset += 4;
-        let text = `[INIT]\nNumGrh=${total}\nVersion=${ver}\n\n[Graphics]\n`;
-        while (offset < buffer.byteLength) {
-            const index = view.getInt32(offset, true); offset += 4;
-            if (index <= 0) break;
-            const frames = view.getInt16(offset, true); offset += 2;
-            if (frames === 1) {
-                const f = view.getInt32(offset, true); offset += 4;
-                const x = view.getInt16(offset, true); offset += 2;
-                const y = view.getInt16(offset, true); offset += 2;
-                const w = view.getInt16(offset, true); offset += 2;
-                const h = view.getInt16(offset, true); offset += 2;
-                text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
-            } else {
-                let ids = [];
-                for(let i=0; i<frames; i++) { ids.push(view.getInt32(offset, true)); offset += 4; }
-                const spd = view.getFloat32(offset, true); offset += 4;
-                text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
+// ================= IND (NO TOCADO) =================
+const editor = document.getElementById('editor');
+
+document.getElementById('loadInd').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const view = new DataView(buffer);
+
+    let offset = 0;
+    const ver = view.getInt32(offset, true); offset += 4;
+    const total = view.getInt32(offset, true); offset += 4;
+
+    let text = `[INIT]\nNumGrh=${total}\nVersion=${ver}\n\n[Graphics]\n`;
+
+    while (offset < buffer.byteLength) {
+        const index = view.getInt32(offset, true); offset += 4;
+        if (index <= 0) break;
+
+        const frames = view.getInt16(offset, true); offset += 2;
+
+        if (frames === 1) {
+            const f = view.getInt32(offset, true); offset += 4;
+            const x = view.getInt16(offset, true); offset += 2;
+            const y = view.getInt16(offset, true); offset += 2;
+            const w = view.getInt16(offset, true); offset += 2;
+            const h = view.getInt16(offset, true); offset += 2;
+
+            text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
+        } else {
+            let ids = [];
+            for(let i=0; i<frames; i++) {
+                ids.push(view.getInt32(offset, true));
+                offset += 4;
             }
-        }
-        editor.value = text;
-    };
+            const spd = view.getFloat32(offset, true); offset += 4;
 
-    function saveInd() { /* (Misma lógica anterior de descarga) */ }
-    function saveIni() { download(editor.value, "Graficos.ini", "text/plain"); }
-    function download(c, n, t) { const b = new Blob([c], { type: t }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = n; a.click(); }
+            text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
+        }
+    }
+
+    editor.value = text;
+};
+
+function saveIni() {
+    const blob = new Blob([editor.value], { type: "text/plain" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "Graficos.ini";
+    a.click();
+}
 </script>
+
 </body>
 </html>
