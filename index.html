@@ -1,34 +1,36 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Amnerys - Suite de Desarrollo AO</title>
-    <style>
-        body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-        .view { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
-        .active { display: flex !important; }
-        #mainMenu { align-items: center; justify-content: center; gap: 20px; }
-        .logo-title { font-size: 3em; text-shadow: 0 0 15px #00ff00; margin-bottom: 20px; color: #fff; }
-        .grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; }
-        .card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
-        .card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; box-shadow: 0 5px 20px rgba(0, 173, 181, 0.3); }
-        .header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
-        .btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; transition: 0.2s; font-family: 'Consolas', monospace; }
-        .btn-back { background: #ff4d4d; color: white; }
-        .btn-action { background: #00adb5; color: white; }
-        .btn-secondary { background: #444; color: white; }
-        .status { color: #888; font-size: 12px; margin-left: auto; }
-        #editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 15px; font-size: 14px; resize: none; outline: none; }
-        #mapDebug { flex: 1; background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; overflow-y: auto; font-size: 12px; white-space: pre; }
-    </style>
+<meta charset="UTF-8">
+<title>Amnerys - Suite de Desarrollo AO</title>
+
+<style>
+body { font-family: 'Consolas', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+.view { display: none; flex-direction: column; height: 100vh; padding: 20px; box-sizing: border-box; }
+.active { display: flex !important; }
+#mainMenu { align-items: center; justify-content: center; gap: 20px; }
+.logo-title { font-size: 3em; text-shadow: 0 0 15px #00ff00; margin-bottom: 20px; color: #fff; }
+.grid-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; }
+.card { background: #1e1e1e; border: 2px solid #333; padding: 30px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.3s; }
+.card:hover { border-color: #00adb5; transform: translateY(-5px); background: #252525; }
+.header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+.btn { padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; }
+.btn-back { background: #ff4d4d; color: white; }
+.btn-action { background: #00adb5; color: white; }
+.btn-secondary { background: #444; color: white; }
+.status { color: #888; font-size: 12px; margin-left: auto; }
+#editor { flex: 1; background: #000; color: #0f0; border: 1px solid #333; padding: 15px; font-size: 14px; resize: none; }
+#mapDebug { flex: 1; background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; overflow-y: auto; font-size: 12px; white-space: pre; }
+</style>
 </head>
+
 <body>
 
 <div id="mainMenu" class="view active">
     <div class="logo-title">AMNERYS SUITE</div>
     <div class="grid-buttons">
-        <div class="card" onclick="showView('editorContainer')">Editor Index AO</div>
-        <div class="card" onclick="showView('mapScannerContainer')">Analizador de Mapas</div>
+        <div class="card" onclick="showView('editorContainer')">Editor .IND</div>
+        <div class="card" onclick="showView('mapScannerContainer')">Analizador MAP / INF / DAT</div>
     </div>
 </div>
 
@@ -37,9 +39,9 @@
         <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
         <strong>Indexador Graficos.ind</strong>
         <input type="file" id="loadInd" style="display:none">
-        <button class="btn btn-secondary" onclick="document.getElementById('loadInd').click()">Cargar .IND</button>
+        <button class="btn btn-secondary" onclick="loadInd.click()">Cargar .IND</button>
         <button class="btn btn-secondary" onclick="saveIni()">Exportar .INI</button>
-        <div class="status" id="statusEditor">Listo</div>
+        <div class="status">IND intacto</div>
     </div>
     <textarea id="editor"></textarea>
 </div>
@@ -47,139 +49,184 @@
 <div id="mapScannerContainer" class="view">
     <div class="header">
         <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-        <strong>Analizador de Archivos de Mapa</strong>
-        <input type="file" id="mapInput" style="display:none" accept=".map">
-        <input type="file" id="infInput" style="display:none" accept=".inf">
-        <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar .MAP</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('infInput').click()">Analizar .INF</button>
+        <input type="file" id="mapInput" style="display:none">
+        <input type="file" id="infInput" style="display:none">
+        <input type="file" id="datInput" style="display:none">
+        <button class="btn btn-action" onclick="mapInput.click()">Cargar .MAP</button>
+        <button class="btn btn-secondary" onclick="infInput.click()">Cargar .INF</button>
+        <button class="btn btn-secondary" onclick="datInput.click()">Cargar .DAT</button>
         <div class="status" id="statusMap">Esperando archivo...</div>
     </div>
-    <div id="mapDebug">Selecciona un archivo .map o .inf para analizar su estructura.</div>
+    <div id="mapDebug"></div>
 </div>
 
 <script>
-function showView(viewId) {
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
+function showView(v){
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    document.getElementById(v).classList.add('active');
 }
 
-// ================= ANALIZADOR .INF (NUEVO) =================
-document.getElementById('infInput').onchange = async (e) => {
+////////////////////////////////////////////////////////////
+// MAP
+////////////////////////////////////////////////////////////
+mapInput.onchange = async e=>{
     const file = e.target.files[0];
-    if (!file) return;
-
     const buffer = await file.arrayBuffer();
     const view = new DataView(buffer);
-    let output = `ANALIZANDO ESTRUCTURA INF: ${file.name}\n`;
-    output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
-    output += `------------------------------------------------------------\n\n`;
 
-    output += `VOLCADO HEXADECIMAL Y TEXTO (Estructura interna):\n\n`;
-    
-    // Analizamos los bloques del INF buscando strings o IDs
-    for (let i = 0; i < buffer.byteLength; i += 16) {
-        let hex = "";
-        let ascii = "";
-        for (let j = 0; j < 16; j++) {
-            if (i + j < buffer.byteLength) {
-                const b = view.getUint8(i + j);
-                hex += b.toString(16).toUpperCase().padStart(2, '0') + " ";
-                ascii += (b >= 32 && b <= 126) ? String.fromCharCode(b) : ".";
+    let output = `MAP: ${file.name}\n\n`;
+
+    const START = 272;
+    const SIZE = 3;
+    const W = 100;
+    const H = 100;
+
+    let offset = START;
+    let count = 0;
+
+    for(let y=0;y<H;y++){
+        for(let x=0;x<W;x++){
+            if(offset+3>buffer.byteLength) break;
+
+            const block = view.getUint8(offset);
+            const grh = view.getUint16(offset+1,true);
+
+            if(count<500){
+                output += `${x},${y} | ${block} | ${grh}\n`;
+            }
+
+            offset+=SIZE;
+            count++;
+        }
+    }
+
+    output += `\nTotal tiles: ${count}`;
+    mapDebug.innerText = output;
+    statusMap.innerText = "MAP OK";
+};
+
+////////////////////////////////////////////////////////////
+// INF (DECODIFICADO)
+////////////////////////////////////////////////////////////
+infInput.onchange = async e=>{
+    const file = e.target.files[0];
+    const buffer = await file.arrayBuffer();
+    const view = new DataView(buffer);
+
+    let output = `INF: ${file.name}\n\n`;
+
+    let offset = 0;
+    let count = 0;
+
+    while(offset < buffer.byteLength-6){
+
+        if(view.getUint8(offset)===1 && view.getUint8(offset+1)===2){
+
+            const tipo = view.getUint16(offset+2,true);
+            const id = view.getUint16(offset+4,true);
+
+            output += `Bloque ${count}\n`;
+            output += `Offset: 0x${offset.toString(16)}\n`;
+            output += `Tipo: ${tipo} | ID: ${id}\n`;
+
+            let data=[];
+            for(let i=0;i<16;i++){
+                if(offset+6+i>=buffer.byteLength) break;
+                data.push(view.getUint8(offset+6+i).toString(16).padStart(2,'0'));
+            }
+
+            output += `Data: ${data.join(' ')}\n\n`;
+
+            count++;
+            offset+=6;
+        }else{
+            offset++;
+        }
+    }
+
+    output += `TOTAL BLOQUES: ${count}`;
+    mapDebug.innerText = output;
+    statusMap.innerText = "INF OK";
+};
+
+////////////////////////////////////////////////////////////
+// DAT (NUEVO)
+////////////////////////////////////////////////////////////
+datInput.onchange = async e=>{
+    const file = e.target.files[0];
+    const buffer = await file.arrayBuffer();
+    const view = new DataView(buffer);
+
+    let output = `DAT: ${file.name}\n\n`;
+
+    // Explorador inteligente
+    for(let i=0;i<buffer.byteLength;i+=16){
+
+        let hex="";
+        let ascii="";
+
+        for(let j=0;j<16;j++){
+            if(i+j<buffer.byteLength){
+                let b=view.getUint8(i+j);
+                hex+=b.toString(16).padStart(2,'0')+" ";
+                ascii+=(b>=32&&b<=126)?String.fromCharCode(b):".";
             }
         }
-        output += `${i.toString(16).toUpperCase().padStart(4, '0')} | ${hex.padEnd(48)} | ${ascii}\n`;
+
+        output += `${i.toString(16).padStart(4,'0')} | ${hex.padEnd(48)} | ${ascii}\n`;
     }
 
-    document.getElementById('mapDebug').innerText = output;
-    document.getElementById('statusMap').innerText = "Archivo .INF Analizado";
+    mapDebug.innerText = output;
+    statusMap.innerText = "DAT ANALIZADO";
 };
 
-// ================= MAP DECODER COMPLETO (MANTENIDO) =================
-document.getElementById('mapInput').onchange = async (e) => {
+////////////////////////////////////////////////////////////
+// IND (NO TOCADO)
+////////////////////////////////////////////////////////////
+loadInd.onchange = async e=>{
     const file = e.target.files[0];
-    if (!file) return;
-
     const buffer = await file.arrayBuffer();
     const view = new DataView(buffer);
 
-    let output = `ARCHIVO: ${file.name}\n`;
-    const version = view.getUint8(0);
-    output += `VERSIÓN AO: ${version}\n`;
-    output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
-    output += `------------------------------------------------------------\n`;
+    let offset=0;
+    const ver=view.getInt32(offset,true); offset+=4;
+    const total=view.getInt32(offset,true); offset+=4;
 
-    const MAP_WIDTH = 100;
-    const MAP_HEIGHT = 100;
-    const TILE_SIZE = 3;
-    const START_OFFSET = 272;
+    let text=`[INIT]\nNumGrh=${total}\nVersion=${ver}\n\n[Graphics]\n`;
 
-    let offset = START_OFFSET;
-    let tiles = [];
+    while(offset<buffer.byteLength){
+        const index=view.getInt32(offset,true); offset+=4;
+        if(index<=0) break;
 
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-        for (let x = 0; x < MAP_WIDTH; x++) {
-            if (offset + 3 > buffer.byteLength) break;
-            const blocked = view.getUint8(offset);
-            const grh = view.getUint16(offset + 1, true);
-            tiles.push({ x, y, blocked, grh });
-            offset += TILE_SIZE;
+        const frames=view.getInt16(offset,true); offset+=2;
+
+        if(frames===1){
+            const f=view.getInt32(offset,true); offset+=4;
+            const x=view.getInt16(offset,true); offset+=2;
+            const y=view.getInt16(offset,true); offset+=2;
+            const w=view.getInt16(offset,true); offset+=2;
+            const h=view.getInt16(offset,true); offset+=2;
+
+            text+=`Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
+        }else{
+            let ids=[];
+            for(let i=0;i<frames;i++){
+                ids.push(view.getInt32(offset,true));
+                offset+=4;
+            }
+            const spd=view.getFloat32(offset,true); offset+=4;
+            text+=`Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
         }
     }
 
-    const MAX_PRINT = 500;
-    output += `MAPA (${MAP_WIDTH}x${MAP_HEIGHT})\n`;
-    output += `X,Y | Block | GRH\n`;
-    output += `--------------------------------\n`;
-
-    for (let i = 0; i < tiles.length && i < MAX_PRINT; i++) {
-        const t = tiles[i];
-        output += `${t.x},${t.y} | ${t.blocked} | ${t.grh}\n`;
-    }
-
-    output += `\nTotal tiles: ${tiles.length}\n`;
-    if (tiles.length > MAX_PRINT) output += `⚠️ Limitado a ${MAX_PRINT} tiles\n`;
-
-    document.getElementById('mapDebug').innerText = output;
-    document.getElementById('statusMap').innerText = "Mapa decodificado completo";
+    editor.value=text;
 };
 
-// ================= IND (MANTENIDO) =================
-const editor = document.getElementById('editor');
-document.getElementById('loadInd').onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
-    let offset = 0;
-    const ver = view.getInt32(offset, true); offset += 4;
-    const total = view.getInt32(offset, true); offset += 4;
-    let text = `[INIT]\nNumGrh=${total}\nVersion=${ver}\n\n[Graphics]\n`;
-    while (offset < buffer.byteLength) {
-        const index = view.getInt32(offset, true); offset += 4;
-        if (index <= 0) break;
-        const frames = view.getInt16(offset, true); offset += 2;
-        if (frames === 1) {
-            const f = view.getInt32(offset, true); offset += 4;
-            const x = view.getInt16(offset, true); offset += 2;
-            const y = view.getInt16(offset, true); offset += 2;
-            const w = view.getInt16(offset, true); offset += 2;
-            const h = view.getInt16(offset, true); offset += 2;
-            text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
-        } else {
-            let ids = [];
-            for(let i=0; i<frames; i++) { ids.push(view.getInt32(offset, true)); offset += 4; }
-            const spd = view.getFloat32(offset, true); offset += 4;
-            text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
-        }
-    }
-    editor.value = text;
-};
-
-function saveIni() {
-    const blob = new Blob([editor.value], { type: "text/plain" });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = "Graficos.ini";
+function saveIni(){
+    const blob=new Blob([editor.value],{type:"text/plain"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="Graficos.ini";
     a.click();
 }
 </script>
