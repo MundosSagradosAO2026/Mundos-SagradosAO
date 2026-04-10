@@ -16,6 +16,21 @@ body{
 .view{ display:none; height:100vh; flex-direction:column; }
 .active{ display:flex; }
 
+/* MENU */
+.menu{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    gap:20px;
+    height:100vh;
+}
+
+.menu h1{
+    color:#00ffcc;
+    text-shadow:0 0 15px #00ffcc;
+}
+
 /* HEADER */
 .header{
     background:#111;
@@ -26,17 +41,12 @@ body{
     border-bottom:1px solid #222;
 }
 
-.title{
-    font-size:20px;
-    color:#00ffcc;
-}
-
 /* BOTONES */
 button{
     background:#1e1e1e;
     border:1px solid #333;
     color:#00ff9c;
-    padding:8px 15px;
+    padding:10px 20px;
     cursor:pointer;
 }
 
@@ -54,75 +64,56 @@ button:hover{
     white-space:pre;
 }
 
-/* MENU */
-.menu{
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    flex-direction:column;
-    gap:20px;
-}
-
-.menu h1{
-    color:#00ffcc;
-    text-shadow:0 0 15px #00ffcc;
+/* TEXTAREA */
+textarea{
+    flex:1;
+    background:#000;
+    color:#00ff9c;
+    border:none;
+    padding:10px;
 }
 </style>
 </head>
 
 <body>
 
-<!-- MENU -->
+<!-- MENU PRINCIPAL -->
 <div id="main" class="view active menu">
     <h1>RECURSOS AMNERYS AO</h1>
 
-    <button onclick="mapInput.click()">📂 Abrir MAP</button>
-    <button onclick="infInput.click()">📁 Abrir INF</button>
-    <button onclick="datInput.click()">⚙️ Abrir DAT</button>
-    <button onclick="show('ind')">🖼️ Editor IND</button>
-
-    <input type="file" id="mapInput" hidden>
-    <input type="file" id="infInput" hidden>
-    <input type="file" id="datInput" hidden>
+    <button onclick="show('menuMap')">📂 Mapas (MAP / INF / DAT)</button>
+    <button onclick="show('menuInd')">🖼️ Graficos.ind</button>
 </div>
 
-<!-- MAP VIEW -->
-<div id="viewMap" class="view">
+<!-- MENU MAPAS -->
+<div id="menuMap" class="view">
     <div class="header">
-        <button onclick="show('main')">←</button>
-        <div class="title">MAPA</div>
+        <button onclick="show('main')">← Volver</button>
+
+        <button onclick="mapInput.click()">Cargar MAP</button>
+        <button onclick="infInput.click()">Cargar INF</button>
+        <button onclick="datInput.click()">Cargar DAT</button>
+
+        <input type="file" id="mapInput" hidden>
+        <input type="file" id="infInput" hidden>
+        <input type="file" id="datInput" hidden>
     </div>
+
     <div id="mapPanel" class="panel"></div>
 </div>
 
-<!-- INF VIEW -->
-<div id="viewInf" class="view">
+<!-- MENU IND -->
+<div id="menuInd" class="view">
     <div class="header">
-        <button onclick="show('main')">←</button>
-        <div class="title">INF (EVENTOS)</div>
-    </div>
-    <div id="infPanel" class="panel"></div>
-</div>
+        <button onclick="show('main')">← Volver</button>
 
-<!-- DAT VIEW -->
-<div id="viewDat" class="view">
-    <div class="header">
-        <button onclick="show('main')">←</button>
-        <div class="title">DAT (CONFIG)</div>
-    </div>
-    <div id="datPanel" class="panel"></div>
-</div>
-
-<!-- IND -->
-<div id="ind" class="view">
-    <div class="header">
-        <button onclick="show('main')">←</button>
         <button onclick="loadInd.click()">Cargar IND</button>
         <button onclick="saveIni()">Exportar INI</button>
+
         <input type="file" id="loadInd" hidden>
     </div>
-    <textarea id="editor" style="flex:1;background:#000;color:#0f0;"></textarea>
+
+    <textarea id="editor"></textarea>
 </div>
 
 <script>
@@ -161,9 +152,7 @@ mapInput.onchange = async e=>{
     }
 
     out += "\nTotal tiles: "+count;
-
     mapPanel.innerText = out;
-    show("viewMap");
 };
 
 //////////////////////////////////////////////////
@@ -174,7 +163,7 @@ infInput.onchange = async e=>{
     const buf = await file.arrayBuffer();
     const view = new DataView(buf);
 
-    let out = "EVENTOS INF\n\n";
+    let out = "INF EVENTOS\n\n";
 
     let offset = 0;
 
@@ -199,8 +188,7 @@ infInput.onchange = async e=>{
         }else offset++;
     }
 
-    infPanel.innerText = out;
-    show("viewInf");
+    mapPanel.innerText = out;
 };
 
 //////////////////////////////////////////////////
@@ -218,12 +206,11 @@ datInput.onchange = async e=>{
         if(l.trim()) out+=l+"\n";
     });
 
-    datPanel.innerText = out;
-    show("viewDat");
+    mapPanel.innerText = out;
 };
 
 //////////////////////////////////////////////////
-// IND (igual)
+// IND
 //////////////////////////////////////////////////
 loadInd.onchange = async e=>{
     const file = e.target.files[0];
