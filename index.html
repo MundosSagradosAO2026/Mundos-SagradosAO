@@ -47,12 +47,14 @@
 <div id="mapScannerContainer" class="view">
     <div class="header">
         <button class="btn btn-back" onclick="showView('mainMenu')">← Menú</button>
-        <strong>Decodificador .MAP</strong>
-        <input type="file" id="mapInput" style="display:none">
-        <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar Mapa</button>
-        <div class="status" id="statusMap">Listo</div>
+        <strong>Analizador de Archivos de Mapa</strong>
+        <input type="file" id="mapInput" style="display:none" accept=".map">
+        <input type="file" id="infInput" style="display:none" accept=".inf">
+        <button class="btn btn-action" onclick="document.getElementById('mapInput').click()">Cargar .MAP</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('infInput').click()">Analizar .INF</button>
+        <div class="status" id="statusMap">Esperando archivo...</div>
     </div>
-    <div id="mapDebug">Selecciona un archivo .map</div>
+    <div id="mapDebug">Selecciona un archivo .map o .inf para analizar su estructura.</div>
 </div>
 
 <script>
@@ -61,7 +63,38 @@ function showView(viewId) {
     document.getElementById(viewId).classList.add('active');
 }
 
-// ================= MAP DECODER COMPLETO =================
+// ================= ANALIZADOR .INF (NUEVO) =================
+document.getElementById('infInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const view = new DataView(buffer);
+    let output = `ANALIZANDO ESTRUCTURA INF: ${file.name}\n`;
+    output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
+    output += `------------------------------------------------------------\n\n`;
+
+    output += `VOLCADO HEXADECIMAL Y TEXTO (Estructura interna):\n\n`;
+    
+    // Analizamos los bloques del INF buscando strings o IDs
+    for (let i = 0; i < buffer.byteLength; i += 16) {
+        let hex = "";
+        let ascii = "";
+        for (let j = 0; j < 16; j++) {
+            if (i + j < buffer.byteLength) {
+                const b = view.getUint8(i + j);
+                hex += b.toString(16).toUpperCase().padStart(2, '0') + " ";
+                ascii += (b >= 32 && b <= 126) ? String.fromCharCode(b) : ".";
+            }
+        }
+        output += `${i.toString(16).toUpperCase().padStart(4, '0')} | ${hex.padEnd(48)} | ${ascii}\n`;
+    }
+
+    document.getElementById('mapDebug').innerText = output;
+    document.getElementById('statusMap').innerText = "Archivo .INF Analizado";
+};
+
+// ================= MAP DECODER COMPLETO (MANTENIDO) =================
 document.getElementById('mapInput').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -70,7 +103,6 @@ document.getElementById('mapInput').onchange = async (e) => {
     const view = new DataView(buffer);
 
     let output = `ARCHIVO: ${file.name}\n`;
-
     const version = view.getUint8(0);
     output += `VERSIÓN AO: ${version}\n`;
     output += `TAMAÑO: ${buffer.byteLength} bytes\n`;
@@ -86,20 +118,15 @@ document.getElementById('mapInput').onchange = async (e) => {
 
     for (let y = 0; y < MAP_HEIGHT; y++) {
         for (let x = 0; x < MAP_WIDTH; x++) {
-
             if (offset + 3 > buffer.byteLength) break;
-
             const blocked = view.getUint8(offset);
             const grh = view.getUint16(offset + 1, true);
-
             tiles.push({ x, y, blocked, grh });
-
             offset += TILE_SIZE;
         }
     }
 
     const MAX_PRINT = 500;
-
     output += `MAPA (${MAP_WIDTH}x${MAP_HEIGHT})\n`;
     output += `X,Y | Block | GRH\n`;
     output += `--------------------------------\n`;
@@ -110,57 +137,41 @@ document.getElementById('mapInput').onchange = async (e) => {
     }
 
     output += `\nTotal tiles: ${tiles.length}\n`;
-
-    if (tiles.length > MAX_PRINT) {
-        output += `⚠️ Limitado a ${MAX_PRINT} tiles\n`;
-    }
+    if (tiles.length > MAX_PRINT) output += `⚠️ Limitado a ${MAX_PRINT} tiles\n`;
 
     document.getElementById('mapDebug').innerText = output;
     document.getElementById('statusMap').innerText = "Mapa decodificado completo";
 };
 
-// ================= IND (NO TOCADO) =================
+// ================= IND (MANTENIDO) =================
 const editor = document.getElementById('editor');
-
 document.getElementById('loadInd').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const buffer = await file.arrayBuffer();
     const view = new DataView(buffer);
-
     let offset = 0;
     const ver = view.getInt32(offset, true); offset += 4;
     const total = view.getInt32(offset, true); offset += 4;
-
     let text = `[INIT]\nNumGrh=${total}\nVersion=${ver}\n\n[Graphics]\n`;
-
     while (offset < buffer.byteLength) {
         const index = view.getInt32(offset, true); offset += 4;
         if (index <= 0) break;
-
         const frames = view.getInt16(offset, true); offset += 2;
-
         if (frames === 1) {
             const f = view.getInt32(offset, true); offset += 4;
             const x = view.getInt16(offset, true); offset += 2;
             const y = view.getInt16(offset, true); offset += 2;
             const w = view.getInt16(offset, true); offset += 2;
             const h = view.getInt16(offset, true); offset += 2;
-
             text += `Grh${index}=1-${f}-${x}-${y}-${w}-${h}\n`;
         } else {
             let ids = [];
-            for(let i=0; i<frames; i++) {
-                ids.push(view.getInt32(offset, true));
-                offset += 4;
-            }
+            for(let i=0; i<frames; i++) { ids.push(view.getInt32(offset, true)); offset += 4; }
             const spd = view.getFloat32(offset, true); offset += 4;
-
             text += `Grh${index}=${frames}-${ids.join('-')}-${spd}\n`;
         }
     }
-
     editor.value = text;
 };
 
