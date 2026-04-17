@@ -109,6 +109,7 @@ textarea{
 
         <button onclick="loadInd.click()">Cargar IND</button>
         <button onclick="saveIni()">Exportar INI</button>
+        <button onclick="saveInd()">Exportar IND</button>
 
         <input type="file" id="loadInd" hidden>
     </div>
@@ -256,6 +257,113 @@ function saveIni(){
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
     a.download="Graficos.ini";
+    a.click();
+}
+
+//////////////////////////////////////////////////
+// NUEVO: EXPORTAR IND
+//////////////////////////////////////////////////
+function saveInd(){
+
+    const text = editor.value.split(/\r?\n/);
+
+    let version = 1;
+    let numGrh = 0;
+    let grhData = [];
+
+    for(let line of text){
+
+        line = line.trim();
+        if(!line) continue;
+
+        if(line.startsWith("Version=")){
+            version = parseInt(line.split("=")[1]);
+        }
+
+        if(line.startsWith("NumGrh=")){
+            numGrh = parseInt(line.split("=")[1]);
+        }
+
+        if(line.startsWith("Grh")){
+            const [left, right] = line.split("=");
+
+            const index = parseInt(left.replace("Grh",""));
+            const parts = right.split("-");
+
+            const frames = parseInt(parts[0]);
+
+            if(frames === 1){
+                grhData.push({
+                    index,
+                    frames,
+                    file: parseInt(parts[1]),
+                    x: parseInt(parts[2]),
+                    y: parseInt(parts[3]),
+                    w: parseInt(parts[4]),
+                    h: parseInt(parts[5])
+                });
+            }else{
+                let ids = [];
+
+                for(let i=1;i<=frames;i++){
+                    ids.push(parseInt(parts[i]));
+                }
+
+                const speed = parseFloat(parts[frames+1]);
+
+                grhData.push({
+                    index,
+                    frames,
+                    ids,
+                    speed
+                });
+            }
+        }
+    }
+
+    let size = 8;
+
+    for(let g of grhData){
+        size += 4 + 2;
+
+        if(g.frames === 1){
+            size += 4 + 2 + 2 + 2 + 2;
+        }else{
+            size += g.frames * 4 + 4;
+        }
+    }
+
+    const buffer = new ArrayBuffer(size);
+    const view = new DataView(buffer);
+
+    let offset = 0;
+
+    view.setInt32(offset, version, true); offset += 4;
+    view.setInt32(offset, numGrh, true); offset += 4;
+
+    for(let g of grhData){
+
+        view.setInt32(offset, g.index, true); offset += 4;
+        view.setInt16(offset, g.frames, true); offset += 2;
+
+        if(g.frames === 1){
+            view.setInt32(offset, g.file, true); offset += 4;
+            view.setInt16(offset, g.x, true); offset += 2;
+            view.setInt16(offset, g.y, true); offset += 2;
+            view.setInt16(offset, g.w, true); offset += 2;
+            view.setInt16(offset, g.h, true); offset += 2;
+        }else{
+            for(let id of g.ids){
+                view.setInt32(offset, id, true); offset += 4;
+            }
+            view.setFloat32(offset, g.speed, true); offset += 4;
+        }
+    }
+
+    const blob = new Blob([buffer], {type: "application/octet-stream"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "graficos.ind";
     a.click();
 }
 </script>
